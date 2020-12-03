@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nnLayer SYSTEM "nnLayer.dtd">
+<nnLayer>
+    <fc>
+        <in_channels 128*8*8/>
+        <out_channels />
+    </fc>
+</nnLayer>

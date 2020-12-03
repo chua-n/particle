@@ -1,0 +1,18 @@
+<!DOCTYPE nnLayer [
+<!ELEMENT nnLayer (fc* | conv2d* | conv3d* | conv_transpose2d* | conv_transpose3d*)>
+<!ELEMENT fc (in_channels, out_channels, bias, use_bn, activate_mode)>
+<!ELEMENT conv2d (in_channels, out_channels, kernel_size, stride, padding, bias, use_bn, activate_mode)>
+<!ELEMENT conv3d (in_channels, out_channels, kernel_size, stride, padding, bias, use_bn, activate_mode)>
+<!ELEMENT conv_transpose2d (in_channels, out_channels, kernel_size, stride, padding, output_padding, bias, use_bn, activate_mode)>
+<!ELEMENT conv_transpose3d (in_channels, out_channels, kernel_size, stride, padding, output_padding, bias, use_bn, activate_mode)>
+<!ELEMENT in_channels (#PCDATA)>
+<!ELEMENT out_channels (#PCDATA)>
+<!ELEMENT kernel_size (#PCDATA)>
+<!ELEMENT stride (#PCDATA)>
+<!ELEMENT padding (#PCDATA)>
+<!ELEMENT output_padding (#PCDATA)>
+<!ELEMENT bias (#PCDATA)>
+<!ELEMENT use_bn (#PCDATA)>
+<!ELEMENT activate_mode (#PCDATA)>
+
+        ]>
