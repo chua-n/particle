@@ -3,62 +3,42 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
-from particle.utils import project
+from particle.utils import project, parseConfig, constructOneLayer
 from particle.pipeline import Sand
 
 
 class Reconstructor(nn.Module):
     """Reconstruct a particle from it's three views from x, y, z orientation.
     """
-    def __init__(self):
+
+    def __init__(self, xmlFile):
         super().__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 32, 4, 2, padding=1, bias=False),
-            nn.ReLU())
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(32, 64, 4, 2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU())
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.ReLU())
-        self.fc = nn.Sequential(
-            nn.Linear(128 * 8 * 8, 1024, bias=False),
-            nn.BatchNorm1d(1024),
-            nn.ReLU())
-        self.conv_transpose1 = nn.Sequential(
-            nn.ConvTranspose3d(1024, 512, 4, 1, padding=0, bias=False),
-            nn.BatchNorm3d(512),
-            nn.ReLU())
-        self.conv_transpose2 = nn.Sequential(
-            nn.ConvTranspose3d(512, 256, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(256),
-            nn.ReLU())
-        self.conv_transpose3 = nn.Sequential(
-            nn.ConvTranspose3d(256, 128, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(128),
-            nn.ReLU())
-        self.conv_transpose4 = nn.Sequential(
-            nn.ConvTranspose3d(128, 64, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(64),
-            nn.ReLU())
-        self.conv_transpose5 = nn.Sequential(
-            nn.ConvTranspose3d(64, 1, 4, 2, padding=1, bias=False),
-            nn.Sigmoid())
+        nnParams = parseConfig(xmlFile)
+        self.convBlock = nn.Sequential()
+        self.fcBlock = nn.Sequential()
+        self.convTransposeBlock = nn.Sequential()
+        self.fcBlockInFeatures = None
+        self.fcBlockOutFeatures = None
+        for layerType, layerParam in nnParams.items():
+            if layerType.startswith("fc"):
+                if self.fcBlockInFeatures is None:
+                    self.fcBlockInFeatures = nnParams[layerType]["in_features"]
+                self.fcBlockOutFeatures = nnParams[layerType]["out_features"]
+                self.fcBlock.add_module(
+                    layerType.split("_")[-1], constructOneLayer(layerType, layerParam))
+            elif layerType.startswith("convTranspose"):
+                self.convTransposeBlock.add_module(
+                    layerType.split("_")[-1], constructOneLayer(layerType, layerParam))
+            else:
+                self.convBlock.add_module(
+                    layerType.split("_")[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
-        x = nn.Sequential(self.conv1,
-                          self.conv2,
-                          self.conv3)(x)
-        x = x.view(x.size(0), 128 * 8 * 8)
-        x = self.fc(x)
-        x = x.view(x.size(0), 1024, 1, 1, 1)
-        x = nn.Sequential(self.conv_transpose1,
-                          self.conv_transpose2,
-                          self.conv_transpose3,
-                          self.conv_transpose4,
-                          self.conv_transpose5)(x)
+        x = self.convBlock(x)
+        x = x.view(x.size(0), self.fcBlockInFeatures)
+        x = self.fcBlock(x)
+        x = x.view(x.size(0), self.fcBlockOutFeatures, 1, 1, 1)
+        x = self.convTransposeBlock(x)
         return x
 
     def criterion(self, y_re, y):
@@ -150,6 +130,7 @@ if __name__ == '__main__':
         projection_test, source_test), batch_size=2*BS, shuffle=False)
 
     model = Reconstructor().to(device)
+    print(model)
     optim = torch.optim.Adam(model.parameters(), lr=LR)
 
     losses = []

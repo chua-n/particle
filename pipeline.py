@@ -3,7 +3,7 @@ import numpy as np
 import scipy.ndimage as ndi
 from skimage import measure as sm
 from skimage import filters
-from mayavi import mlab
+# from mayavi import mlab
 from scipy.spatial import ConvexHull
 
 from .utils import sample_labels, Circumsphere
@@ -180,7 +180,7 @@ class Sand:
     def get_zernike_moments(self, order=6, scale_input=True, decimate_fraction=0,
                             decimate_smooth=25, verbose=False):
         """计算沙土颗粒的Zernike矩, moment是矩的意思。调得人家的包，没什么好说的。"""
-        from mindboggle.shapes.zernike.zernike import zernike_moments
+        from particle.mindboggle.shapes.zernike.zernike import zernike_moments
         verts, faces = self.surface(self.cube)
         descriptors = zernike_moments(verts, faces, order, scale_input,
                                       decimate_fraction, decimate_smooth,

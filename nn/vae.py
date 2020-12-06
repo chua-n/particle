@@ -227,7 +227,7 @@ class VAE(nn.Module):
             when `voxel=True`.
         """
 
-        from pipeline import Sand
+        from particle.pipeline import Sand
         self.eval()
         with torch.no_grad():
             x_re, *_ = self.forward(x)
@@ -251,7 +251,7 @@ class VAE(nn.Module):
         glyph(str, optinoal): The glyph represents a single voxel, this argument
             works only when `voxel=True`"""
 
-        from pipeline import Sand
+        from particle.pipeline import Sand
         if coding is None:
             coding = torch.randn(1, self.n_latent)
         self.eval()

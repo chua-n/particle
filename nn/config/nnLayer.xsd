@@ -1,0 +1,54 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="nju.chuan.nnLayer" xmlns="nju.chuan.nnLayer" elementFormDefault="qualified">
+    <xs:element name="nnLayer">
+        <xs:complexType>
+            <xs:choice maxOccurs="unbounded">
+                <xs:element name="fc" type="fullyConnected" minOccurs="0" maxOccurs="unbounded" />
+                <xs:element name="conv2d" type="conv" minOccurs="0" maxOccurs="unbounded" />
+                <xs:element name="conv3d" type="conv" minOccurs="0" maxOccurs="unbounded" />
+                <xs:element name="convTranspose2d" type="convTranspose" minOccurs="0" maxOccurs="unbounded" />
+                <xs:element name="convTranspose3d" type="convTranspose" minOccurs="0" maxOccurs="unbounded" />
+            </xs:choice>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="fullyConnected">
+        <xs:sequence>
+            <xs:element name="in_features" type="xs:unsignedInt" />
+            <xs:element name="out_features" type="xs:unsignedInt" />
+            <xs:element name="bias" type="xs:boolean" />
+            <xs:element name="use_bn" type="xs:boolean" />
+            <xs:element name="activate_mode" type="xs:string" />
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:unsignedByte" use="required" />
+    </xs:complexType>
+
+    <xs:complexType name="conv">
+        <xs:sequence>
+            <xs:element name="in_channels" type="xs:unsignedInt" />
+            <xs:element name="out_channels" type="xs:unsignedInt" />
+            <xs:element name="kernel_size" type="xs:unsignedByte" />
+            <xs:element name="stride" type="xs:unsignedByte" />
+            <xs:element name="padding" type="xs:unsignedByte" />
+            <xs:element name="bias" type="xs:boolean" />
+            <xs:element name="use_bn" type="xs:boolean" />
+            <xs:element name="activate_mode" type="xs:string" />
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:unsignedByte" use="required" />
+    </xs:complexType>
+
+    <xs:complexType name="convTranspose">
+        <xs:sequence>
+            <xs:element name="in_channels" type="xs:unsignedInt" />
+            <xs:element name="out_channels" type="xs:unsignedInt" />
+            <xs:element name="kernel_size" type="xs:unsignedByte" />
+            <xs:element name="stride" type="xs:unsignedByte" />
+            <xs:element name="padding" type="xs:unsignedByte" />
+            <xs:element name="output_padding" type="xs:unsignedByte" default="0" />
+            <xs:element name="bias" type="xs:boolean" />
+            <xs:element name="use_bn" type="xs:boolean" />
+            <xs:element name="activate_mode" type="xs:string" />
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:unsignedByte" use="required" />
+    </xs:complexType>
+
+</xs:schema>
