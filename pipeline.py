@@ -3,7 +3,6 @@ import numpy as np
 import scipy.ndimage as ndi
 from skimage import measure as sm
 from skimage import filters
-from mayavi import mlab
 from scipy.spatial import ConvexHull
 
 from .utils import sample_labels, Circumsphere
@@ -69,7 +68,8 @@ class Sand:
             a colormap to the mesh."""
         if cube is None:
             cube = self.cube
-        verts, faces, *_ = sm.marching_cubes(cube, level, method='lewiner')  # 只保留前两个参数
+        # 只保留前两个参数
+        verts, faces, *_ = sm.marching_cubes(cube, level, method='lewiner')
         return verts, faces
 
     def visualize(self, cube: np.ndarray = None, figure=None,
@@ -81,6 +81,7 @@ class Sand:
             可视化颗粒的表面，可选择画实心的体素形式，或提取的三角网格的表面形式，后者可选择是否
         进行高斯模糊以逼真化展示。
         """
+        from mayavi import mlab
         if cube is None:
             cube = self.cube
         cube = cube.astype(np.float)
@@ -110,6 +111,7 @@ class Sand:
     @staticmethod
     def savefig(fig_handle, filename, path=None, magnification='auto'):
         """保存某3D颗粒的图片到目的路径"""
+        from mayavi import mlab
         if path:
             cwd = os.getcwd()
             os.chdir(path)
@@ -359,10 +361,3 @@ class SandHeap:
         regions = sm.regionprops(self.heap)
         target = regions[label-1]
         return target.coords
-
-
-if __name__ == "__main__":
-    data = np.load("./data/test_set.npy")
-    sandCube = data[45, 0]
-    sand = Sand(sandCube)
-    print(sand.circumscribed_sphere())

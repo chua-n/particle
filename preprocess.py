@@ -71,6 +71,7 @@ def get_learn_data(data):
             normalized[10*(label-1) + i, 1] = cube_n
     return original, normalized
 
+
 class DataSet(object):  # ？？？
     """可能跟tensorflow的批量训练习惯有关"""
 

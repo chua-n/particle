@@ -9,7 +9,6 @@ from skimage.measure import marching_cubes_lewiner
 
 import torch
 from torch import nn
-from mayavi import mlab
 
 
 def sample_labels(size: int, lim: list, seed: int = None) -> np.ndarray:
@@ -49,7 +48,6 @@ class DisplayCube:
     @staticmethod
     def plot_mpl(cube):
         import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
         from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
         verts, faces, *_ = marching_cubes_lewiner(cube, 0)
@@ -387,6 +385,7 @@ class Plotter:
         x = radius * np.outer(np.cos(u), np.sin(v)) + center[0]
         y = radius * np.outer(np.sin(u), np.sin(v)) + center[1]
         z = radius * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
+        from mayavi import mlab
         # scene = mlab.points3d(x, y, z, mode="point")
         color = cls.randomColor() if color is None else color
         scene = mlab.mesh(x, y, z, color=color, opacity=opacity)
@@ -397,6 +396,7 @@ class Plotter:
         """Tetrahedron: tri.points[tri.simplices[i]]
 
         Delaunay tetrahedral似乎不是根据三维体画出来的，而是三维表面画出来的。"""
+        from mayavi import mlab
         color = cls.randomColor() if color is None else color
         scene = mlab.triangular_mesh(tetrahedron[:, 0], tetrahedron[:, 1], tetrahedron[:, 2],
                                      [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)],
@@ -412,6 +412,7 @@ class Plotter:
         cuboidVerticesX/Y/Z (np.ndarray, shape (2, 2, 2)): coordinates of the 8 vertices 
             of a cuboid along X/Y/Z axis.
         """
+        from mayavi import mlab
         scene = mlab.gcf()
 
         def plotPlane(slice1, slice2, slice3):

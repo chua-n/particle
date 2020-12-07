@@ -2,7 +2,7 @@ import numpy as np
 from skimage.morphology import skeletonize, skeletonize_3d
 from mayavi import mlab
 
-datafile = r"E:\Code\VAE\data\test_set.npy"
+datafile = "./data/test_set.npy"
 data = np.load(datafile)
 sand = data[15, 0]
 sand_skeleton = skeletonize(sand)
