@@ -9,7 +9,7 @@ from skimage.measure import marching_cubes_lewiner
 
 import torch
 from torch import nn
-# from mayavi import mlab
+from mayavi import mlab
 
 
 def sample_labels(size: int, lim: list, seed: int = None) -> np.ndarray:

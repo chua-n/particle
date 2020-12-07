@@ -1,15 +1,11 @@
 import random
 import numpy as np
 from mayavi import mlab
-import scipy
 from scipy.spatial import Delaunay
 from scipy.spatial.qhull import QhullError
 
-# from min_bound_sphere.exact_min_bound_sphere_3D import exact_min_bound_sphere_3D
 from particle.utils import Circumsphere
 from particle.pipeline import Sand
-
-mlab.options.offsceen = True
 
 
 def getDelaunayTetrahedralMesh(sandCube):
@@ -29,7 +25,7 @@ def circumscribedSphere(tetrahedron):
     """问题：
     1、可能出现QhullError
     2、计算出来的半径可能会无穷大；"""
-    radius, center, *_ = exact_min_bound_sphere_3D(tetrahedron)
+    radius, center, *_ = Circumsphere.fit(tetrahedron)
     # 暂时这样解决一下半径无穷大问题
     # 这样处理不好，无穷大也是一种信息，最好在后期处理的时候使用异常捕捉
     if radius == np.inf:

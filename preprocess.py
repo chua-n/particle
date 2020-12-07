@@ -2,7 +2,7 @@ import os
 import numpy as np
 import skimage.io as skio
 
-from pipeline import Sand, SandHeap
+from .pipeline import Sand, SandHeap
 
 
 def load_data(work_path):

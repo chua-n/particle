@@ -3,7 +3,7 @@ import numpy as np
 import scipy.ndimage as ndi
 from skimage import measure as sm
 from skimage import filters
-# from mayavi import mlab
+from mayavi import mlab
 from scipy.spatial import ConvexHull
 
 from .utils import sample_labels, Circumsphere
@@ -69,7 +69,7 @@ class Sand:
             a colormap to the mesh."""
         if cube is None:
             cube = self.cube
-        verts, faces, *_ = sm.marching_cubes_lewiner(cube, level)  # 只保留前两个参数
+        verts, faces, *_ = sm.marching_cubes(cube, level, method='lewiner')  # 只保留前两个参数
         return verts, faces
 
     def visualize(self, cube: np.ndarray = None, figure=None,
