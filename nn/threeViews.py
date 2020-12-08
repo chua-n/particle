@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
 
 from particle.utils import project, parseConfig, constructOneLayer
 from particle.pipeline import Sand
