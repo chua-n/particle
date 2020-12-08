@@ -49,15 +49,15 @@
     <!-- 4 * 4 -->
     <fc id="1">
         <in_features>1024</in_features>
-        <out_features>512</out_features>
+        <out_features>256</out_features>
         <bias>false</bias>
         <use_bn>true</use_bn>
         <activate_mode>relu</activate_mode>
     </fc>
 
     <convTranspose3d id="1">
-        <in_channels>512</in_channels>
-        <out_channels>256</out_channels>
+        <in_channels>256</in_channels>
+        <out_channels>128</out_channels>
         <kernel_size>4</kernel_size>
         <stride>1</stride>
         <padding>0</padding>
@@ -68,18 +68,6 @@
     </convTranspose3d>
 
     <convTranspose3d id="2">
-        <in_channels>256</in_channels>
-        <out_channels>128</out_channels>
-        <kernel_size>4</kernel_size>
-        <stride>2</stride>
-        <padding>1</padding>
-        <output_padding>0</output_padding>
-        <bias>false</bias>
-        <use_bn>true</use_bn>
-        <activate_mode>relu</activate_mode>
-    </convTranspose3d>
-
-    <convTranspose3d id="3">
         <in_channels>128</in_channels>
         <out_channels>64</out_channels>
         <kernel_size>4</kernel_size>
@@ -91,7 +79,7 @@
         <activate_mode>relu</activate_mode>
     </convTranspose3d>
 
-    <convTranspose3d id="4">
+    <convTranspose3d id="3">
         <in_channels>64</in_channels>
         <out_channels>32</out_channels>
         <kernel_size>4</kernel_size>
@@ -103,8 +91,20 @@
         <activate_mode>relu</activate_mode>
     </convTranspose3d>
 
-    <convTranspose3d id="5">
+    <convTranspose3d id="4">
         <in_channels>32</in_channels>
+        <out_channels>16</out_channels>
+        <kernel_size>4</kernel_size>
+        <stride>2</stride>
+        <padding>1</padding>
+        <output_padding>0</output_padding>
+        <bias>false</bias>
+        <use_bn>true</use_bn>
+        <activate_mode>relu</activate_mode>
+    </convTranspose3d>
+
+    <convTranspose3d id="5">
+        <in_channels>16</in_channels>
         <out_channels>1</out_channels>
         <kernel_size>4</kernel_size>
         <stride>2</stride>
