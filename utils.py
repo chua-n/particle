@@ -372,7 +372,7 @@ class Plotter:
         return color
 
     @classmethod
-    def sphere(cls, center, radius, nPoints=100, opacity=1.0, color=None):
+    def singleSphere(cls, center, radius, nPoints=100, opacity=1.0, color=None):
         """Draw a sphere according to given center and radius.
 
         Parameters:
@@ -389,6 +389,22 @@ class Plotter:
         # scene = mlab.points3d(x, y, z, mode="point")
         color = cls.randomColor() if color is None else color
         scene = mlab.mesh(x, y, z, color=color, opacity=opacity)
+        return scene
+
+    @staticmethod
+    def sphere(center, radius, resolution=30):
+        """Draw some spheres according to given center and radius.
+
+        Parameters:
+        -----------
+        center(np.array, n*3): x, y, z coordinates of n spheres
+        radius(np.array, n): radii of the n spheres
+        resolution(int): resolution of each sphere in returned scene
+        """
+        x, y, z = center[:, 0], center[:, 1], center[:, 2]
+        from mayavi import mlab
+        scene = mlab.points3d(
+            x, y, z, radius*2, scale_factor=1, resolution=resolution)
         return scene
 
     @classmethod
