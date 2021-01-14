@@ -1,5 +1,2 @@
-__pycache__/mayaviOffScreen.cpython-37.pyc
-__pycache__/pipeline.cpython-37.pyc
-__pycache__/utils.cpython-37.pyc
-nn/__pycache__/threeViews.cpython-37.pyc
-nn/__pycache__/threeViews1.cpython-37.pyc
+__pycache__/*
+*/__pycache__/*
