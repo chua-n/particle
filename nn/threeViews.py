@@ -1,8 +1,11 @@
+import os
 import torch
 from torch import nn
 import torch.nn.functional as F
 
-from particle.utils import project, parseConfig, constructOneLayer
+from particle.utils.log import setLogger
+from particle.utils.xml import parseConfig, constructOneLayer
+from particle.utils.dirty import project
 from particle.pipeline import Sand
 
 
@@ -10,9 +13,12 @@ class Reconstructor(nn.Module):
     """Reconstruct a particle from it's three views from x, y, z orientation.
     """
 
-    def __init__(self, xmlFile):
+    def __init__(self, xmlFile, log_dir="output/log/", ckpt_dir='output/threeViews'):
         super().__init__()
-        nnParams = parseConfig(xmlFile)
+        hp, nnParams = parseConfig(xmlFile)
+        self.hp = hp
+        self.logger = setLogger("threeViews", log_dir)
+        self.ckpt_dir = ckpt_dir
         self.convBlock = nn.Sequential()
         self.fcBlock = nn.Sequential()
         self.convTransposeBlock = nn.Sequential()
@@ -46,16 +52,6 @@ class Reconstructor(nn.Module):
         loss_re = torch.sum(loss_re, axis=tuple(range(1, loss_re.ndim)))
         loss_re = torch.mean(loss_re)   # scalar
         return loss_re
-
-    @staticmethod
-    def get_projection_set(source_set):
-        """source_set: torch.Tensor"""
-        projection_set = torch.empty((source_set.size(0), 3, source_set.size(2), source_set.size(2)),
-                                     dtype=source_set.dtype)
-        for i in range(source_set.size(0)):
-            for j in range(3):
-                projection_set[i, j] = project(source_set[i, 0], j)
-        return projection_set
 
     def contrast(self, x, y, voxel=False, glyph='sphere'):
         """对于输入的数据源颗粒y及其投影x，对比其原始的颗粒图像与对应的重建颗粒的图像，
@@ -98,3 +94,58 @@ class Reconstructor(nn.Module):
             fig = cube.visualize(figure='Generated Particle', color=color, opacity=opacity,
                                  voxel=voxel, glyph=glyph, scale_mode='scalar')
         return fig
+
+
+def get_projection_set(source_set):
+    """source_set: torch.Tensor"""
+    projection_set = torch.empty((source_set.size(0), 3, source_set.size(2), source_set.size(2)),
+                                 dtype=source_set.dtype)
+    for i in range(source_set.size(0)):
+        for j in range(3):
+            projection_set[i, j] = project(source_set[i, 0], j)
+    return projection_set
+
+
+def train(model: Reconstructor, train_set, test_set, device):
+    model = model.to(device)
+    optim = torch.optim.Adam(model.parameters(), lr=model.hp['lr'])
+
+    logger = model.logger
+    logger.critical(f"\n{model}")
+    ckpt_dir = os.path.abspath(model.ckpt_dir)
+
+    losses = []
+    test_losses = []
+    for epoch in range(model.hp["nEpoch"]):
+        model.train()
+        for i, (x, y) in enumerate(train_set):
+            x = x.to(dtype=torch.float32, device=device)
+            y = y.to(dtype=torch.float32, device=device)
+            y_re = model(x)
+            loss = model.criterion(y_re, y)
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
+            losses.append(loss.item())
+            if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
+                logger.info("Epoch[{}/{}], Step [{}/{}], Loss_re: {:.4f}".
+                            format(epoch+1, model.hp["nEpoch"], i+1, len(train_set), loss.item()))
+
+        # 评估在测试集上的损失
+        model.eval()
+        with torch.no_grad():
+            # 为啥autopep8非要把我的lambda表达式给换成def函数形式？？？
+            def transfer(x): return x.to(dtype=torch.float32, device=device)
+            # sum函数将其内部视为生成器表达式？？？
+            test_loss = sum(model.criterion(
+                model(transfer(x)), transfer(y)) for x, y in test_set)
+            test_loss /= len(test_set)  # 这里取平均数
+            test_losses.append(test_loss)
+        logger.info("The loss in test set after {}-th epoch is: {:.4f}".format(
+            epoch + 1, test_loss))
+        ckpt_name = f"state_dict_{test_loss}.pt" if test_loss < 7300 else "state_dict.pt"
+        torch.save(model.state_dict(), os.path.join(ckpt_dir, ckpt_name))
+        logger.info(f"Model checkpoint has been stored in {ckpt_dir}.")
+
+    logger.info("Train finished!")
+    return losses, test_losses

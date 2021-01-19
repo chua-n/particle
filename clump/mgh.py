@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from mayavi import mlab
 from particle.pipeline import Sand
-from particle.utils import Plotter
+import particle.utils.plotter as plotter
 
 
 class CellCollection:
@@ -166,7 +166,7 @@ class SCPMatrix:
         center, radii = self.solver()
         for i, c in enumerate(center):
             r = radii[i]
-            Plotter.sphere(c, r, opacity=1.0)
+            plotter.sphere(c, r, opacity=1.0)
         # mlab.show()
 
 
@@ -182,7 +182,7 @@ def plotTest(sand: Sand, cells: CellCollection):
     mlab.points3d(cells.boundaryCoords[:, 0],
                   cells.boundaryCoords[:, 1],
                   cells.boundaryCoords[:, 2], color=(0, 0, 1), opacity=0.7)
-    # Plotter.cuboid(*cells._getCuboid(), opacity=0.5)
+    # plotter.cuboid(*cells._getCuboid(), opacity=0.5)
     mlab.xlabel("x")
     mlab.ylabel("y")
     mlab.zlabel("z")

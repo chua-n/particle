@@ -1,51 +1,26 @@
+import os
+
+import torch
 from torch import nn
-
-
-n_latent = 100  # latent vector
-ngf = 64  # generator feature map size
-ndf = 64  # discriminator feature map size
+from particle.pipeline import Sand
+from particle.utils.xml import parseConfig, constructOneLayer
+from particle.utils.log import setLogger
+from mayavi import mlab
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, xmlFile):
         super().__init__()
-        # 1 * 64 * 64 * 64
-        self.conv1 = nn.Sequential(
-            nn.Conv3d(1, ndf, 4, 2, padding=1, bias=False),
-            # nn.BatchNorm3d(ndf),  # why have no BN layer
-            nn.LeakyReLU(0.2))  # nn.LeakyReLU(0.2, inplace=True)
-
-        # ndf * 32 * 32 * 32
-        self.conv2 = nn.Sequential(
-            nn.Conv3d(ndf, ndf * 2, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(ndf * 2),
-            nn.LeakyReLU(0.2))
-
-        # (ndf * 2) * 16 * 16 * 16
-        self.conv3 = nn.Sequential(
-            nn.Conv3d(ndf * 2, ndf * 4, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(ndf * 4),
-            nn.LeakyReLU(0.2))
-
-        # (ndf * 4) * 8 * 8 * 8
-        self.conv4 = nn.Sequential(
-            nn.Conv3d(ndf * 4, ndf * 8, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(ndf * 8),
-            nn.LeakyReLU(0.2))
-
-        # (ndf * 8) * 4 * 4 * 4
-        self.conv5 = nn.Sequential(
-            nn.Conv3d(ndf * 8, 1, 4, 1, padding=0, bias=False),
-            nn.Sigmoid())
-
-        # finally: 1 * 1 * 1 * 1
+        hp, nnParams = parseConfig(xmlFile)
+        self.hp = hp
+        self.convBlock = nn.Sequential()
+        for layerType, layerParam in nnParams.items():
+            if layerType.startswith("conv3d"):
+                self.convBlock.add_module(
+                    layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
-        return nn.Sequential(self.conv1,
-                             self.conv2,
-                             self.conv3,
-                             self.conv4,
-                             self.conv5)(x)
+        return self.convBlock(x)
 
     def weights_init(self):
         for module in self.modules():
@@ -59,46 +34,18 @@ class Discriminator(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self):
+    def __init__(self, xmlFile):
         super().__init__()
-
-        # n_latent * 1 * 1 * 1
-        self.conv_transpose1 = nn.Sequential(
-            nn.ConvTranspose3d(n_latent, ngf * 8, 4, 1, padding=0, bias=False),
-            nn.BatchNorm3d(ngf * 8),
-            nn.ReLU())
-
-        # (ngf * 8) * 4 * 4 * 4
-        self.conv_transpose2 = nn.Sequential(
-            nn.ConvTranspose3d(ngf * 8, ngf * 4, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(ngf * 4),
-            nn.ReLU())
-
-        # (ngf * 4) * 8 * 8 * 8
-        self.conv_transpose3 = nn.Sequential(
-            nn.ConvTranspose3d(ngf * 4, ngf * 2, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(ngf * 2),
-            nn.ReLU())
-
-        # (ngf * 2) * 16 * 16 * 16
-        self.conv_transpose4 = nn.Sequential(
-            nn.ConvTranspose3d(ngf * 2, ngf, 4, 2, padding=1, bias=False),
-            nn.BatchNorm3d(ngf),
-            nn.ReLU())
-
-        # ngf * 32 * 32 * 32
-        self.conv_transpose5 = nn.Sequential(
-            nn.ConvTranspose3d(ngf, 1, 4, 2, padding=1, bias=False),
-            nn.Tanh())
-
-        # 1 * 64 * 64 * 64
+        hp, nnParams = parseConfig(xmlFile)
+        self.hp = hp
+        self.convTransposeBlock = nn.Sequential()
+        for layerType, layerParam in nnParams.items():
+            if layerType.startswith("convTranspose3d"):
+                self.convTransposeBlock.add_module(
+                    layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
-        return nn.Sequential(self.conv_transpose1,
-                             self.conv_transpose2,
-                             self.conv_transpose3,
-                             self.conv_transpose4,
-                             self.conv_transpose5)(x)
+        return self.convTransposeBlock(x)
 
     def weights_init(self):
         for module in self.modules():
@@ -108,3 +55,89 @@ class Generator(nn.Module):
                 nn.init.normal_(module.weight.data, 1.0, 0.02)
                 nn.init.constant_(module.bias.data, 0)  # no change
         return
+
+
+def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_dir="output/log", ckpt_dir="output/dcgan/param"):
+    logger = setLogger("dcgan", log_dir)
+    ckpt_dir = os.path.abspath(ckpt_dir)
+    img_dir = os.path.abspath(img_dir)
+    assert net_D.hp == net_G.hp, "The hyperparameters in Discriminator and Generator are supposed to be the same."
+    hp = net_D.hp
+    logger.critical(f"\n{hp}")
+    net_D = net_D.to(device)
+    net_G = net_G.to(device)
+    logger.critical(f"\n{net_D}")
+    logger.critical(f"\n{net_G}")
+    optim_D = torch.optim.Adam(
+        net_D.parameters(), lr=hp['lr'], betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(
+        net_G.parameters(), lr=hp['lr'], betas=(0.5, 0.999))
+
+    # 要知道：G是通过优化D来间接提升自己的，故两个网络只需一个loss criterion
+    criterion = nn.BCELoss()
+
+    # Create a batch of latent vectors that we will use to visualize the progression of the generator
+    fixed_noise = torch.randn(5, hp['nLatent'], 1, 1, 1, device=device)
+
+    # Establish convention for real and fake labels during training
+    real_label = 1
+    fake_label = 0
+    for epoch in range(hp["nEpoch"]):
+        for i, (x,) in enumerate(train_set):
+            x = x.to(dtype=torch.float, device=device)
+            # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+            # 判真
+            label = torch.full((x.size(0),), real_label,
+                               device=device, dtype=torch.float)
+            net_D.zero_grad()
+            judgement_real = net_D(x).view(-1)
+            loss_D_real = criterion(judgement_real, label)
+            loss_D_real.backward()
+            D_x = judgement_real.mean().item()
+            # 判假
+            noise = torch.randn(
+                x.size(0), hp['nLatent'], 1, 1, 1, device=device)
+            fake = net_G(noise)
+            label.fill_(fake_label)
+            judgement_fake = net_D(fake.detach()).view(-1)
+            loss_D_fake = criterion(judgement_fake, label)
+            loss_D_fake.backward()
+            D_G_z1 = judgement_fake.mean().item()
+            loss_D = loss_D_real + loss_D_fake
+            optim_D.step()
+
+            # (2) Update G network: maximize log(D(G(z)))
+            net_G.zero_grad()
+            label.fill_(real_label)  # fake labels are real for generator cost
+            # Since we just updated D, perform another forward pass of all-fake batch through D
+            judgement = net_D(fake).view(-1)
+            loss_G = criterion(judgement, label)
+            loss_G.backward()
+            D_G_z2 = judgement.mean().item()
+            optim_G.step()
+
+            if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
+                logger.info("Epoch[{}/{}], Step [{}/{}], Loss_D: {:.4f}, Loss_G: {:.4f}, D(x): {:.4f}, D(G(z)): {:.4f} / {:.4f}".
+                            format(epoch + 1, hp["nEpoch"], i + 1, len(train_set), loss_D.item(), loss_G.item(), D_x, D_G_z1, D_G_z2))
+
+        # 每轮结束保存一次模型参数
+        torch.save({
+            'discriminator_state_dict': net_D.state_dict(),
+            'generator_state_dict': net_G.state_dict(),
+            'optim_D_state_dict': optim_D.state_dict(),
+            'optim_G_state_dict': optim_G.state_dict()}, os.path.join(ckpt_dir, 'state_dict.tar'))
+        logger.info(f"Model checkpoint has been stored in {ckpt_dir}.")
+
+        net_G.eval()
+        with torch.no_grad():
+            cubes = net_G(fixed_noise).to('cpu').numpy()
+            for i, cube in enumerate(cubes):
+                cube = cube[0]
+                sand = Sand(cube)
+                sand.visualize(voxel=True, glyph='point', scale_mode='scalar')
+                mlab.outline()
+                mlab.axes()
+                mlab.savefig(os.path.join(img_dir, f'{epoch + 1}-{i + 1}.png'))
+                mlab.close()
+        net_G.train()
+    logger.info("Train finished!")

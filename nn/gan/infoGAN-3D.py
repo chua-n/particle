@@ -8,7 +8,7 @@ from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.utils import save_image
 
-from utils import fig2array
+from particle.utils.plotter import fig2array
 
 ngf = 64  # generator feature map size
 ndf = 64  # discriminator feature map size

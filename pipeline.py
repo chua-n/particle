@@ -5,7 +5,7 @@ from skimage import measure as sm
 from skimage import filters
 from scipy.spatial import ConvexHull
 
-from .utils import sample_labels, Circumsphere
+from .utils.dirty import sample_labels, Circumsphere
 
 
 class Sand:
@@ -257,12 +257,17 @@ class Sand:
         return volume / convex_hull.volume
 
     def angularity(self) -> float:
-        """计算颗粒棱角度(angularity).
-        定义为等效椭球表面积 P_e 和凸包表面积 P_c"""
+        """计算颗粒棱角度(angularity).定义为凸包表面积 P_c 和等效椭球表面积 P_e 之比。"""
         a, b, c = self.equ_ellipsoidal_params()
         P_e = 4*np.pi*(((a*b)**1.6+(a*c)**1.6+(b*c)**1.6)/3)**(1/1.6)
         P_c = self.sand_convex_hull().area
         return P_c / P_e
+
+    def roughness(self) -> float:
+        """计算颗粒的粗糙度。"""
+        surf_p = self.surf_area()
+        surf_c = self.sand_convex_hull().area
+        return surf_p/surf_c
 
     def cal_geo_feat_cube(self) -> list:  # dict更好
         pass

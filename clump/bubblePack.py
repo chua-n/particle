@@ -4,7 +4,7 @@ from mayavi import mlab
 from scipy.spatial import Delaunay
 from scipy.spatial.qhull import QhullError
 
-from particle.utils import Circumsphere
+from particle.utils.dirty import Circumsphere
 from particle.pipeline import Sand
 
 
