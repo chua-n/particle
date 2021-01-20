@@ -1,11 +1,11 @@
 import os
 
 import torch
-from torch import nn
-from particle.pipeline import Sand
-from particle.utils.xml import parseConfig, constructOneLayer
-from particle.utils.log import setLogger
 from mayavi import mlab
+from particle.pipeline import Sand
+from particle.utils.log import setLogger
+from particle.utils.xml import constructOneLayer, parseConfig
+from torch import nn
 
 
 class Discriminator(nn.Module):
@@ -13,14 +13,17 @@ class Discriminator(nn.Module):
         super().__init__()
         hp, nnParams = parseConfig(xmlFile)
         self.hp = hp
-        self.convBlock = nn.Sequential()
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("conv3d"):
-                self.convBlock.add_module(
+                self.add_module(
                     layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
-        return self.convBlock(x)
+        judge = x
+        for module in self.children():
+            judge = module(judge)
+        judge = judge.view(-1)
+        return judge
 
     def weights_init(self):
         for module in self.modules():
@@ -38,14 +41,16 @@ class Generator(nn.Module):
         super().__init__()
         hp, nnParams = parseConfig(xmlFile)
         self.hp = hp
-        self.convTransposeBlock = nn.Sequential()
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("convTranspose3d"):
-                self.convTransposeBlock.add_module(
+                self.add_module(
                     layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
-        return self.convTransposeBlock(x)
+        output = x.reshape(*x.shape, 1, 1, 1)
+        for module in self.children():
+            output = module(output)
+        return output
 
     def weights_init(self):
         for module in self.modules():
@@ -55,6 +60,18 @@ class Generator(nn.Module):
                 nn.init.normal_(module.weight.data, 1.0, 0.02)
                 nn.init.constant_(module.bias.data, 0)  # no change
         return
+
+
+def generate(net_G, vector):
+    net_G = net_G.cpu()
+    net_G.eval()
+    if vector.shape == (net_G.hp['nLatent'],):
+        vector.unsqueeze_(dim=0)
+
+    with torch.no_grad():
+        cubes = net_G(vector)
+        cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+    return cubes
 
 
 def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_dir="output/log", ckpt_dir="output/dcgan/param"):
@@ -77,7 +94,7 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
     criterion = nn.BCELoss()
 
     # Create a batch of latent vectors that we will use to visualize the progression of the generator
-    fixed_noise = torch.randn(5, hp['nLatent'], 1, 1, 1, device=device)
+    fixed_noise = torch.randn(5, hp['nLatent'], device=device)
 
     # Establish convention for real and fake labels during training
     real_label = 1
@@ -90,16 +107,15 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
             label = torch.full((x.size(0),), real_label,
                                device=device, dtype=torch.float)
             net_D.zero_grad()
-            judgement_real = net_D(x).view(-1)
+            judgement_real = net_D(x)
             loss_D_real = criterion(judgement_real, label)
             loss_D_real.backward()
             D_x = judgement_real.mean().item()
             # 判假
-            noise = torch.randn(
-                x.size(0), hp['nLatent'], 1, 1, 1, device=device)
+            noise = torch.randn(x.size(0), hp['nLatent'], device=device)
             fake = net_G(noise)
             label.fill_(fake_label)
-            judgement_fake = net_D(fake.detach()).view(-1)
+            judgement_fake = net_D(fake.detach())
             loss_D_fake = criterion(judgement_fake, label)
             loss_D_fake.backward()
             D_G_z1 = judgement_fake.mean().item()
@@ -110,7 +126,7 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
             net_G.zero_grad()
             label.fill_(real_label)  # fake labels are real for generator cost
             # Since we just updated D, perform another forward pass of all-fake batch through D
-            judgement = net_D(fake).view(-1)
+            judgement = net_D(fake)
             loss_G = criterion(judgement, label)
             loss_G.backward()
             D_G_z2 = judgement.mean().item()

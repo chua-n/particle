@@ -88,6 +88,7 @@ def constructOneLayer(layerType, layerParam):
     if type(layerParam["activate_mode"]) is dict:
         activeParam = layerParam["activate_mode"]["attribute"]
         layerParam["activate_mode"] = layerParam["activate_mode"]["value"]
+
     if layerParam["activate_mode"] == "sigmoid":
         layer.add_module("activate", nn.Sigmoid())
     elif layerParam["activate_mode"] == "relu":
@@ -99,9 +100,10 @@ def constructOneLayer(layerType, layerParam):
             layer.add_module("activate", nn.LeakyReLU())
     elif layerParam["activate_mode"] == "tanh":
         layer.add_module("activate", nn.Tanh())
+    elif layerParam["activate_mode"] == "null":
+        pass
     else:
-        raise Exception(
-            "`activate_mode` is error.")
+        raise Exception("`activate_mode` is error.")
 
     return layer
 

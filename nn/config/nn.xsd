@@ -70,6 +70,7 @@
 
     <xs:simpleType name="activateFunc">
         <xs:restriction base="xs:string">
+            <xs:enumeration value="null"/>
             <xs:enumeration value="sigmoid"/>
             <xs:enumeration value="relu"/>
             <xs:enumeration value="leakyrelu"/>
