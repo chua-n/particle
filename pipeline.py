@@ -12,7 +12,7 @@ class Sand:
 
     """对单个沙土颗粒进行相关处理的类"""
 
-    def __init__(self, cube: np.uint8, level: float = None):
+    def __init__(self, cube: np.uint8):
         """cube是容纳单个颗粒的二值化的三维数字图像矩阵, verts为提取的沙土颗粒表面的顶点组成的点集；
         level的含义用于self.surface()函数
         Attributes:
@@ -21,7 +21,11 @@ class Sand:
         verts: nPoints × 3"""
 
         self.cube = cube
-        self.verts = self.surface(level=level)[0]
+        self._volume = None
+        self._area = None
+        self._verts = None
+        self._faces = None
+        self._convexHull = None
 
     def get_border_coord(self):
         """获得一个颗粒在cube中的边界坐标，包括内外边界"""
@@ -69,8 +73,9 @@ class Sand:
         if cube is None:
             cube = self.cube
         # 只保留前两个参数
-        verts, faces, *_ = sm.marching_cubes(cube, level, method='lewiner')
-        return verts, faces
+        self._verts, self._faces, *_ = sm.marching_cubes(cube, level,
+                                                         method='lewiner')
+        return self._verts, self._faces
 
     def visualize(self, cube: np.ndarray = None, figure=None,
                   color=(0.65, 0.65, 0.65), opacity=1.0,
@@ -183,15 +188,16 @@ class Sand:
                             decimate_smooth=25, verbose=False):
         """计算沙土颗粒的Zernike矩, moment是矩的意思。调得人家的包，没什么好说的。"""
         from particle.mindboggle.shapes.zernike.zernike import zernike_moments
-        verts, faces = self.surface(self.cube)
-        descriptors = zernike_moments(verts, faces, order, scale_input,
+        if self._verts is None or self._faces is None:
+            self.surface(self.cube)
+        descriptors = zernike_moments(self._verts, self._faces, order, scale_input,
                                       decimate_fraction, decimate_smooth,
                                       verbose)
         return descriptors
 
     # ----------------------------以下为计算颗粒的几何特征参数--------------------------
 
-    def sand_convex_hull(self) -> ConvexHull:
+    def sand_convex_hull(self, level: float = None) -> ConvexHull:
         """获取沙颗粒的凸包
         ConvexHull is a class that calculates the convex hull（凸包） of a given point set.
         |  Parameters
@@ -219,12 +225,17 @@ class Sand:
         |      .. versionadded:: 0.17.0
         |  volume : float
         |      Volume of the convex hull."""
-        convex_hull = ConvexHull(self.verts)
+        if self._verts is None:
+            self.surface(level=level)
+        convex_hull = ConvexHull(self._verts)
+        self._convexHull = convex_hull
         return convex_hull
 
-    def circumscribed_sphere(self):
+    def circumscribed_sphere(self, level: float = None):
         """返回沙土颗粒的最小外接球的半径和球心坐标，似乎也是调用的人家的包"""
-        radius, centre, *_ = Circumsphere.fit(self.verts)
+        if self._verts is None:
+            self.surface(level=level)
+        radius, centre, *_ = Circumsphere.fit(self._verts)
         return radius, centre
 
     def equ_ellipsoidal_params(self):
@@ -237,12 +248,18 @@ class Sand:
         """计算沙土颗粒的表面积"""
         verts, faces = self.surface(level=0)
         area = sm.mesh_surface_area(verts, faces)
+        self._area = area
         return area
+
+    def volume(self) -> float:
+        volume = np.sum(self.cube == 1)
+        self._volume = volume
+        return volume
 
     def sphericity(self) -> float:
         """计算球度sphericity"""
-        volume = np.sum(self.cube == 1)
-        area = self.surf_area()
+        volume = self.volume() if self._volume is None else self._volume
+        area = self.surf_area() if self._area is None else self._area
         return (36*np.pi*volume**2)**(1/3) / area
 
     def EI_FI(self) -> tuple:
@@ -252,21 +269,23 @@ class Sand:
 
     def convexity(self) -> float:
         """计算凸度：颗粒体积与凸包体积之比"""
-        convex_hull = self.sand_convex_hull()
-        volume = np.sum(self.cube == 1)
+        convex_hull = self.sand_convex_hull() if self._convexHull is None else self._convexHull
+        volume = self.volume() if self._volume is None else self._volume
         return volume / convex_hull.volume
 
     def angularity(self) -> float:
         """计算颗粒棱角度(angularity).定义为凸包表面积 P_c 和等效椭球表面积 P_e 之比。"""
         a, b, c = self.equ_ellipsoidal_params()
         P_e = 4*np.pi*(((a*b)**1.6+(a*c)**1.6+(b*c)**1.6)/3)**(1/1.6)
-        P_c = self.sand_convex_hull().area
+        convex_hull = self.sand_convex_hull() if self._convexHull is None else self._convexHull
+        P_c = convex_hull.area
         return P_c / P_e
 
     def roughness(self) -> float:
         """计算颗粒的粗糙度。"""
         surf_p = self.surf_area()
-        surf_c = self.sand_convex_hull().area
+        convex_hull = self.sand_convex_hull() if self._convexHull is None else self._convexHull
+        surf_c = convex_hull.area
         return surf_p/surf_c
 
     def cal_geo_feat_cube(self) -> list:  # dict更好
