@@ -22,7 +22,7 @@ class Discriminator(nn.Module):
         judge = x
         for module in self.children():
             judge = module(judge)
-        judge = judge.view(-1)
+        judge = judge.view(judge.size(0))
         return judge
 
     def weights_init(self):
@@ -46,8 +46,8 @@ class Generator(nn.Module):
                 self.add_module(
                     layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
 
-    def forward(self, x):
-        output = x.reshape(*x.shape, 1, 1, 1)
+    def forward(self, vector):
+        output = vector.reshape(*vector.shape, 1, 1, 1)
         for module in self.children():
             output = module(output)
         return output

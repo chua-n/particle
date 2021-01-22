@@ -2,7 +2,7 @@
 <nn xmlns="nju.chuan.nn"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nju.chuan.nn ./nn.xsd">
     <hp>
-        <nEpoch>65</nEpoch>
+        <nEpoch>100</nEpoch>
         <bs>64</bs>
         <lr>0.0002</lr>
         <nLatent>32</nLatent>
