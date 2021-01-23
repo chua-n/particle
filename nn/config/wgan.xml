@@ -4,7 +4,7 @@
     <hp>
         <nEpoch>800</nEpoch>
         <bs>64</bs>
-        <lr>0.0002</lr>
+        <lr>0.00005</lr>
         <nLatent>64</nLatent>
         <clip>0.01</clip>
         <iterD>1</iterD>
