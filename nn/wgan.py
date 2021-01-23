@@ -4,7 +4,7 @@ import torch
 from mayavi import mlab
 from particle.pipeline import Sand
 from particle.utils.log import setLogger
-from particle.utils.xml import constructOneLayer, parseConfig
+from particle.utils.config import constructOneLayer, parseConfig
 from torch import nn
 
 

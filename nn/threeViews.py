@@ -4,7 +4,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from particle.utils.log import setLogger
-from particle.utils.xml import parseConfig, constructOneLayer
+from particle.utils.config import parseConfig, constructOneLayer
 from particle.utils.dirty import project
 from particle.pipeline import Sand
 

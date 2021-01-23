@@ -19,7 +19,20 @@ def setLogger(name, output_dir="output/log/"):
     return logger
 
 
-class Log:
+def parseLog(logFile, key_word):
+    values = []
+    with open(logFile, 'r') as log:
+        for line in log:
+            indBegin = line.find(key_word)
+            if indBegin == -1:
+                continue
+            indBegin += len(key_word) + 1  # 加1是因为冒号
+            indEnd = line.find(',', indBegin)
+            values.append(float(line[indBegin:indEnd]))
+    return values
+
+
+class parseHTMLLog:
     """HTML日志信息提取处理的相关操作"""
 
     @staticmethod
@@ -57,3 +70,18 @@ class Log:
                     s = target.group(3)
                     time.append(int(h)*60 + int(m) + int(s)/60)
         return time
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    log = "/home/chuan/soil/output/log/wgan.log"
+    w_dist = parseLog(log, "w_dist")
+    score_G = parseLog(log, "score_G")
+    fig, ax = plt.subplots(2, 1, sharex=True)
+    ax[0].plot(w_dist)
+    ax[0].set(ylabel="w_dist")
+    ax[1].plot(score_G)
+    ax[1].set(ylabel="score_G")
+    plt.xlabel('iter')
+    plt.show()
