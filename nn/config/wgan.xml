@@ -2,11 +2,12 @@
 <nn xmlns="nju.chuan.nn"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nju.chuan.nn ./nn.xsd">
     <hp>
-        <nEpoch>200</nEpoch>
+        <nEpoch>800</nEpoch>
         <bs>64</bs>
         <lr>0.0002</lr>
         <nLatent>64</nLatent>
         <clip>0.01</clip>
+        <iterD>1</iterD>
     </hp>
     <nnLayer>
         <!-- ndf=16 -->
