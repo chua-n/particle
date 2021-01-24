@@ -55,7 +55,7 @@ def generate(net_G, vector):
     return cubes
 
 
-def train(net_D, net_G, train_set, device, img_dir="output/wgan/process", ckpt_dir="output/wgan/param", log_dir="output/log"):
+def train(net_D, net_G, train_set, device, img_dir="output/wgan_cp/process", ckpt_dir="output/wgan_cp", log_dir="output/wgan_cp"):
     logger = setLogger("wgan", log_dir)
     ckpt_dir = os.path.abspath(ckpt_dir)
     img_dir = os.path.abspath(img_dir)
@@ -106,7 +106,7 @@ def train(net_D, net_G, train_set, device, img_dir="output/wgan/process", ckpt_d
                 optim_G.step()
 
             if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
-                logger.info("Epoch[{}/{}], Step [{}/{}], w_dist: {:.4f}, score_G: {:.4f}".format(
+                logger.info("[Epoch {}/{}] [Step {}/{}] [w_dist: {:.4f}] [score_G: {:.4f}]".format(
                     epoch + 1, hp["nEpoch"], i + 1, len(train_set), w_dist.item(), score_G.item()))
 
         # 每轮结束保存一次模型参数

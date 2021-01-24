@@ -74,7 +74,7 @@ def generate(net_G, vector):
     return cubes
 
 
-def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_dir="output/log", ckpt_dir="output/dcgan/param"):
+def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_dir="output/dcgan", ckpt_dir="output/dcgan"):
     logger = setLogger("dcgan", log_dir)
     ckpt_dir = os.path.abspath(ckpt_dir)
     img_dir = os.path.abspath(img_dir)
@@ -135,7 +135,7 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
                 optim_G.step()
 
             if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
-                logger.info("Epoch[{}/{}], Step [{}/{}], Loss_D: {:.4f}, Loss_G: {:.4f}, D(x): {:.4f}, D(G(z)): {:.4f} / {:.4f}".
+                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_D: {:.4f}] [loss_G: {:.4f}] [D(x): {:.4f}] [D(G(z)): {:.4f}/{:.4f}]".
                             format(epoch + 1, hp["nEpoch"], i + 1, len(train_set), loss_D.item(), loss_G.item(), D_x, D_G_z1, D_G_z2))
 
         # 每轮结束保存一次模型参数

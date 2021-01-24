@@ -13,7 +13,7 @@ class Reconstructor(nn.Module):
     """Reconstruct a particle from it's three views from x, y, z orientation.
     """
 
-    def __init__(self, xmlFile, log_dir="output/log/", ckpt_dir='output/threeViews'):
+    def __init__(self, xmlFile, log_dir="output/threeViews", ckpt_dir='output/threeViews'):
         super().__init__()
         hp, nnParams = parseConfig(xmlFile)
         self.hp = hp
@@ -128,7 +128,7 @@ def train(model: Reconstructor, train_set, test_set, device):
             optim.step()
             losses.append(loss.item())
             if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
-                logger.info("Epoch[{}/{}], Step [{}/{}], Loss_re: {:.4f}".
+                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_re: {:.4f}]".
                             format(epoch+1, model.hp["nEpoch"], i+1, len(train_set), loss.item()))
 
         # 评估在测试集上的损失
