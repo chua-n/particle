@@ -27,7 +27,7 @@ def parseLog(logFile, key_word):
             if indBegin == -1:
                 continue
             indBegin += len(key_word) + 1  # 加1是因为冒号
-            indEnd = line.find(',', indBegin)
+            indEnd = line.find(']', indBegin)
             values.append(float(line[indBegin:indEnd]))
     return values
 
@@ -75,7 +75,7 @@ class parseHTMLLog:
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    log = "/home/chuan/soil/output/log/wgan.log"
+    log = "/home/chuan/soil/output/wgan_gp/wgan_gp.log"
     w_dist = parseLog(log, "w_dist")
     score_G = parseLog(log, "score_G")
     fig, ax = plt.subplots(2, 1, sharex=True)
