@@ -83,9 +83,6 @@ def generate(net_G, vector):
 
 
 def train(net_D, net_G, train_set, device, img_dir="output/wgan_gp/process", ckpt_dir="output/wgan_gp", log_dir="output/wgan_gp"):
-    # Loss weight for gradient penalty
-    lambda_gp = 10
-
     logger = setLogger("wgan_gp", log_dir)
     ckpt_dir = os.path.abspath(ckpt_dir)
     img_dir = os.path.abspath(img_dir)
@@ -130,7 +127,7 @@ def train(net_D, net_G, train_set, device, img_dir="output/wgan_gp/process", ckp
                 # Since we just updated D, perform another forward pass of all-fake batch through D
                 noise = torch.randn(x.size(0), hp['nLatent'], device=device)
                 fake = net_G(noise)
-                score_G = net_D(fake).mean(0).view(1)
+                score_G = net_D(fake).mean()
                 loss_G = -score_G
                 loss_G.backward()
                 optim_G.step()
