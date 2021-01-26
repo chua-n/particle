@@ -6,8 +6,8 @@
         <bs>64</bs>
         <lr>0.00005</lr>
         <nLatent>64</nLatent>
-        <clip>0.01</clip>
         <iterD>1</iterD>
+        <clip>0.01</clip>
     </hp>
     <nnLayer>
         <!-- ndf=16 -->
@@ -15,70 +15,70 @@
 
         <!-- Discriminator -->
         <!-- 1 * 64 * 64 * 64 -->
-        <conv3d id="1">
+        <conv dim="3d" id="1">
             <in_channels>1</in_channels>
             <out_channels>16</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
             <bias>false</bias>
-            <use_bn>false</use_bn>
-            <activate_mode param="0.2">leakyrelu</activate_mode>
-        </conv3d>
+            <normalize>null</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
 
         <!-- ndf * 32 * 32 * 32 -->
-        <conv3d id="2">
+        <conv dim="3d" id="2">
             <in_channels>16</in_channels>
             <out_channels>32</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode param="0.2">leakyrelu</activate_mode>
-        </conv3d>
+            <normalize>bn</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
 
         <!-- (ndf * 2) * 16 * 16 * 16 -->
-        <conv3d id="3">
+        <conv dim="3d" id="3">
             <in_channels>32</in_channels>
             <out_channels>64</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode param="0.2">leakyrelu</activate_mode>
-        </conv3d>
+            <normalize>bn</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
 
         <!-- (ndf * 4) * 8 * 8 * 8 -->
-        <conv3d id="4">
+        <conv dim="3d" id="4">
             <in_channels>64</in_channels>
             <out_channels>128</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode param="0.2">leakyrelu</activate_mode>
-        </conv3d>
+            <normalize>bn</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
 
         <!-- (ndf * 8) * 4 * 4 * 4 -->
-        <conv3d id="5">
+        <conv dim="3d" id="5">
             <in_channels>128</in_channels>
             <out_channels>1</out_channels>
             <kernel_size>4</kernel_size>
             <stride>1</stride>
             <padding>0</padding>
             <bias>false</bias>
-            <use_bn>false</use_bn>
-            <activate_mode>null</activate_mode>
-        </conv3d>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </conv>
         <!-- 1 * 1 * 1 * 1 -->
 
 
         <!-- Generator -->
         <!-- nLatent * 1 * 1 * 1 -->
-        <convTranspose3d id="1">
+        <convT dim="3d" id="1">
             <in_channels>64</in_channels>
             <out_channels>128</out_channels>
             <kernel_size>4</kernel_size>
@@ -86,12 +86,12 @@
             <padding>0</padding>
             <output_padding>0</output_padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode>relu</activate_mode>
-        </convTranspose3d>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
 
         <!-- (ngf * 8) * 4 * 4 * 4 -->
-        <convTranspose3d id="2">
+        <convT dim="3d" id="2">
             <in_channels>128</in_channels>
             <out_channels>64</out_channels>
             <kernel_size>4</kernel_size>
@@ -99,12 +99,12 @@
             <padding>1</padding>
             <output_padding>0</output_padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode>relu</activate_mode>
-        </convTranspose3d>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
 
         <!-- (ngf * 4) * 8 * 8 * 8 -->
-        <convTranspose3d id="3">
+        <convT dim="3d" id="3">
             <in_channels>64</in_channels>
             <out_channels>32</out_channels>
             <kernel_size>4</kernel_size>
@@ -112,12 +112,12 @@
             <padding>1</padding>
             <output_padding>0</output_padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode>relu</activate_mode>
-        </convTranspose3d>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
 
         <!-- (ngf * 2) * 16 * 16 * 16 -->
-        <convTranspose3d id="4">
+        <convT dim="3d" id="4">
             <in_channels>32</in_channels>
             <out_channels>16</out_channels>
             <kernel_size>4</kernel_size>
@@ -125,12 +125,12 @@
             <padding>1</padding>
             <output_padding>0</output_padding>
             <bias>false</bias>
-            <use_bn>true</use_bn>
-            <activate_mode>relu</activate_mode>
-        </convTranspose3d>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
 
         <!-- ngf * 32 * 32 * 32 -->
-        <convTranspose3d id="5">
+        <convT dim="3d" id="5">
             <in_channels>16</in_channels>
             <out_channels>1</out_channels>
             <kernel_size>4</kernel_size>
@@ -138,9 +138,9 @@
             <padding>1</padding>
             <output_padding>0</output_padding>
             <bias>false</bias>
-            <use_bn>false</use_bn>
-            <activate_mode>tanh</activate_mode>
-        </convTranspose3d>
+            <normalize>null</normalize>
+            <activate>tanh</activate>
+        </convT>
 
         <!-- 1 * 64 * 64 * 64 -->
     </nnLayer>

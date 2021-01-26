@@ -14,9 +14,9 @@ class Discriminator(nn.Module):
         hp, nnParams = parseConfig(xmlFile)
         self.hp = hp
         for layerType, layerParam in nnParams.items():
-            if layerType.startswith("conv3d"):
+            if layerType.startswith("conv-"):
                 self.add_module(
-                    layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
+                    layerType.split('-')[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
         judge = x
@@ -42,9 +42,9 @@ class Generator(nn.Module):
         hp, nnParams = parseConfig(xmlFile)
         self.hp = hp
         for layerType, layerParam in nnParams.items():
-            if layerType.startswith("convTranspose3d"):
+            if layerType.startswith("convT-"):
                 self.add_module(
-                    layerType.split('_')[-1], constructOneLayer(layerType, layerParam))
+                    layerType.split('-')[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, vector):
         output = vector.reshape(*vector.shape, 1, 1, 1)

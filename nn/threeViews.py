@@ -25,18 +25,18 @@ class Reconstructor(nn.Module):
         self.fcBlockInFeatures = None
         self.fcBlockOutFeatures = None
         for layerType, layerParam in nnParams.items():
-            if layerType.startswith("fc"):
+            if layerType.startswith("fc-"):
                 if self.fcBlockInFeatures is None:
                     self.fcBlockInFeatures = nnParams[layerType]["in_features"]
                 self.fcBlockOutFeatures = nnParams[layerType]["out_features"]
                 self.fcBlock.add_module(
-                    layerType.split("_")[-1], constructOneLayer(layerType, layerParam))
-            elif layerType.startswith("convTranspose"):
+                    layerType.split("-")[-1], constructOneLayer(layerType, layerParam))
+            elif layerType.startswith("convT-"):
                 self.convTransposeBlock.add_module(
-                    layerType.split("_")[-1], constructOneLayer(layerType, layerParam))
+                    layerType.split("-")[-1], constructOneLayer(layerType, layerParam))
             else:
                 self.convBlock.add_module(
-                    layerType.split("_")[-1], constructOneLayer(layerType, layerParam))
+                    layerType.split("-")[-1], constructOneLayer(layerType, layerParam))
 
     def forward(self, x):
         x = self.convBlock(x)

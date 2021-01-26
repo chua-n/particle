@@ -1,5 +1,6 @@
 from xml.dom import minidom
 from torch import nn
+from torch.nn.modules import normalization
 
 
 def parseConfig(xmlFile):
@@ -7,7 +8,7 @@ def parseConfig(xmlFile):
 
     Returns:
     --------
-    nnParams(dict): note that, since Python 3.6, the default dict strcture 
+    nnParams(dict): note that, since Python 3.6, the default dict strcture
         returned here is an ordered dict.
     """
 
@@ -34,76 +35,111 @@ def parseConfig(xmlFile):
     for layer in nnLayer.childNodes:
         if type(layer) is not minidom.Element:
             continue
-        kwargs = {}
-        for param in layer.childNodes:
-            if type(param) is not minidom.Element:
+        layerName = layer.tagName + '-' + layer.getAttribute("id")
+        if layer.hasAttribute("block"):
+            layerName = layer.getAttribute("block") + '-' + layerName
+        layerContent = {}
+        # layerContent['attribute'] = {key: layer.getAttribute(
+        #     key) for key in layer.attributes.keys()}
+        layerContent['dim'] = layer.getAttribute('dim')
+        for node in layer.childNodes:
+            if type(node) is not minidom.Element:
                 continue
-            text = param.childNodes[0].data
+            text = node.childNodes[0].data
             if text.isdigit():
-                kwargs[param.tagName] = int(text)
+                layerContent[node.tagName] = int(text)
             elif text == "true":
-                kwargs[param.tagName] = True
+                layerContent[node.tagName] = True
             elif text == "false":
-                kwargs[param.tagName] = False
+                layerContent[node.tagName] = False
             else:
-                kwargs[param.tagName] = text
-            if param.tagName == 'activate_mode' and param.hasAttributes():
-                kwargs[param.tagName] = {'attribute': float(param.getAttribute("param")),
-                                         'value': kwargs[param.tagName]}
-        nnParams[layer.tagName+"_"+layer.getAttribute("id")] = kwargs
+                layerContent[node.tagName] = text
+            if node.tagName == 'activate' and node.hasAttributes():
+                layerContent[node.tagName] = {'attribute': float(node.getAttribute("param")),
+                                              'value': layerContent[node.tagName]}
+        nnParams[layerName] = layerContent
     return hp, nnParams
 
 
-def constructOneLayer(layerType, layerParam):
+def constructOneLayer(layerName, layerContent):
+    layerType = layerName.split('-')[-2]
+    dim = layerContent['dim']
+    assert dim in {"1d", "2d", "3d"}
+    if dim == '1d':
+        Conv, ConvT = nn.Conv1d, nn.ConvTranspose1d
+        BatchNorm = nn.BatchNorm1d
+        InstanceNorm = nn.InstanceNorm1d
+    if dim == '2d':
+        Conv, ConvT = nn.Conv2d, nn.ConvTranspose2d
+        BatchNorm = nn.BatchNorm2d
+        InstanceNorm = nn.InstanceNorm2d
+    if dim == '3d':
+        Conv, ConvT = nn.Conv3d, nn.ConvTranspose3d
+        BatchNorm = nn.BatchNorm3d
+        InstanceNorm = nn.InstanceNorm3d
+    normalizeType = layerContent['normalize']
+    # del layerContent['dim']
+
+    def buildNormLayer(normalizeType, num_features):
+        if normalizeType == "null":
+            return None
+        elif normalizeType == "bn":
+            return BatchNorm(num_features)
+        elif normalizeType == "in":
+            return InstanceNorm(num_features)
+        elif normalizeType == "ln":
+            return nn.LayerNorm()
+        else:
+            raise ValueError("Parameter `normalizeType` cannot be resolved!")
+
     layer = nn.Sequential()
-    if layerType.startswith("fc"):
+    if layerType == "fc":
         kwargs = {"in_features", "out_features", "bias"}
-        kwargs = {key: layerParam[key] for key in kwargs}
+        kwargs = {key: layerContent[key] for key in kwargs}
         layer.add_module(layerType, nn.Linear(**kwargs))
-        if layerParam["use_bn"]:
-            layer.add_module("bn", nn.BatchNorm1d(kwargs["out_features"]))
-    elif layerType.startswith("convTranspose"):
-        ConvTranspose, BatchNorm = (nn.ConvTranspose2d, nn.BatchNorm2d) if "2d" in layerType \
-            else (nn.ConvTranspose3d, nn.BatchNorm3d)
-        kwargs = {"in_channels", "out_channels", "kernel_size",
-                  "stride", "padding", "output_padding", "bias"}
-        kwargs = {key: layerParam[key] for key in kwargs}
-        layer.add_module(layerType, ConvTranspose(**kwargs))
-        if layerParam["use_bn"]:
-            layer.add_module("bn", BatchNorm(kwargs["out_channels"]))
-    elif layerType.startswith("conv"):
-        Conv, BatchNorm = (nn.Conv2d, nn.BatchNorm2d) if "2d" in layerType \
-            else (nn.Conv3d, nn.BatchNorm3d)
+        if normalizeType != "null":
+            layer.add_module(normalizeType,
+                             buildNormLayer(normalizeType, kwargs["out_features"]))
+    elif layerType == "conv":
         kwargs = {"in_channels", "out_channels",
                   "kernel_size", "stride", "padding", "bias"}
-        kwargs = {key: layerParam[key] for key in kwargs}
+        kwargs = {key: layerContent[key] for key in kwargs}
         layer.add_module(layerType, Conv(**kwargs))
-        if layerParam["use_bn"]:
-            layer.add_module("bn", BatchNorm(kwargs["out_channels"]))
+        if normalizeType != "null":
+            layer.add_module(normalizeType,
+                             buildNormLayer(normalizeType, kwargs["out_channels"]))
+    elif layerType == "convT":
+        kwargs = {"in_channels", "out_channels", "kernel_size",
+                  "stride", "padding", "output_padding", "bias"}
+        kwargs = {key: layerContent[key] for key in kwargs}
+        layer.add_module(layerType, ConvT(**kwargs))
+        if normalizeType != "null":
+            layer.add_module(normalizeType,
+                             buildNormLayer(normalizeType, kwargs["out_channels"]))
     else:
         raise Exception("xml configuration error!")
 
     # add the activation fucntion layer
     activeParam = None
-    if type(layerParam["activate_mode"]) is dict:
-        activeParam = layerParam["activate_mode"]["attribute"]
-        layerParam["activate_mode"] = layerParam["activate_mode"]["value"]
+    if type(layerContent["activate"]) is dict:
+        activeParam = layerContent["activate"]["attribute"]
+        layerContent["activate"] = layerContent["activate"]["value"]
 
-    if layerParam["activate_mode"] == "sigmoid":
+    if layerContent["activate"] == "sigmoid":
         layer.add_module("activate", nn.Sigmoid())
-    elif layerParam["activate_mode"] == "relu":
+    elif layerContent["activate"] == "relu":
         layer.add_module("activate", nn.ReLU())
-    elif layerParam["activate_mode"] == "leakyrelu":
+    elif layerContent["activate"] == "leakyrelu":
         if activeParam is not None:
             layer.add_module("activate", nn.LeakyReLU(activeParam))
         else:
             layer.add_module("activate", nn.LeakyReLU())
-    elif layerParam["activate_mode"] == "tanh":
+    elif layerContent["activate"] == "tanh":
         layer.add_module("activate", nn.Tanh())
-    elif layerParam["activate_mode"] == "null":
+    elif layerContent["activate"] == "null":
         pass
     else:
-        raise Exception("`activate_mode` is error.")
+        raise Exception("`activate` is error.")
 
     return layer
 
@@ -111,4 +147,4 @@ def constructOneLayer(layerType, layerParam):
 if __name__ == "__main__":
     file = 'particle/nn/config/dcgan.xml'
     hp, nnParams = parseConfig(file)
-    print(hp, nnParams)
+    print(hp, nnParams, sep='\n')
