@@ -36,7 +36,7 @@
             <xs:element name="out_features" type="xs:unsignedInt" />
             <xs:element name="bias" type="xs:boolean" />
             <xs:element name="normalize" type="normalization" />
-            <xs:element name="activate" type="activateFuncWithParam" />
+            <xs:element name="activate" type="activateFunc" />
         </xs:sequence>
         <xs:attribute name="dim" type="dim" use="required" fixed="1d"/>
         <xs:attribute name="block" type="xs:string" use="optional"/>
@@ -52,7 +52,7 @@
             <xs:element name="padding" type="xs:unsignedByte" />
             <xs:element name="bias" type="xs:boolean" />
             <xs:element name="normalize" type="normalization" />
-            <xs:element name="activate" type="activateFuncWithParam" />
+            <xs:element name="activate" type="activateFunc" />
         </xs:sequence>
         <xs:attribute name="dim" type="dim" use="required"/>
         <xs:attribute name="block" type="xs:string" use="optional"/>
@@ -69,14 +69,14 @@
             <xs:element name="output_padding" type="xs:unsignedByte" default="0" />
             <xs:element name="bias" type="xs:boolean" />
             <xs:element name="normalize" type="normalization" />
-            <xs:element name="activate" type="activateFuncWithParam" />
+            <xs:element name="activate" type="activateFunc" />
         </xs:sequence>
         <xs:attribute name="dim" type="dim" use="required"/>
         <xs:attribute name="block" type="xs:string" use="optional"/>
         <xs:attribute name="id" type="xs:unsignedByte" use="required" />
     </xs:complexType>
 
-    <xs:simpleType name="normalization">
+    <xs:simpleType name="normalizationBase">
         <xs:restriction base="xs:string">
             <xs:enumeration value="null"/>
             <xs:enumeration value="bn"/>
@@ -84,6 +84,14 @@
             <xs:enumeration value="in"/>
         </xs:restriction>
     </xs:simpleType>
+
+    <xs:complexType name="normalization">
+        <xs:simpleContent>
+            <xs:extension base="normalizationBase">
+                <xs:attribute name="dataOutShape" type="xs:string" default="N,C,D,H,W" use="optional"/>
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
 
     <xs:simpleType name="dim">
         <xs:restriction base="xs:string">
@@ -94,7 +102,7 @@
         </xs:restriction>
     </xs:simpleType>
 
-    <xs:simpleType name="activateFunc">
+    <xs:simpleType name="activateFuncBase">
         <xs:restriction base="xs:string">
             <xs:enumeration value="null"/>
             <xs:enumeration value="sigmoid"/>
@@ -104,10 +112,10 @@
         </xs:restriction>
     </xs:simpleType>
 
-    <xs:complexType name="activateFuncWithParam">
+    <xs:complexType name="activateFunc">
         <xs:simpleContent>
-            <xs:extension base="activateFunc">
-                <xs:attribute name="param" type="xs:decimal"/>
+            <xs:extension base="activateFuncBase">
+                <xs:attribute name="param" type="xs:decimal" use="optional"/>
             </xs:extension>
         </xs:simpleContent>
     </xs:complexType>

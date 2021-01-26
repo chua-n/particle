@@ -54,9 +54,13 @@ def parseConfig(xmlFile):
                 layerContent[node.tagName] = False
             else:
                 layerContent[node.tagName] = text
-            if node.tagName == 'activate' and node.hasAttributes():
-                layerContent[node.tagName] = {'attribute': float(node.getAttribute("param")),
-                                              'value': layerContent[node.tagName]}
+            if node.hasAttributes():
+                for attri in node.attributes.keys():
+                    layerContent[node.tagName+'.' +
+                                 attri] = node.getAttribute(attri)
+            # if node.tagName == 'activate' and node.hasAttributes():
+            #     layerContent[node.tagName] = {'attribute': float(node.getAttribute("param")),
+            #                                   'value': layerContent[node.tagName]}
         nnParams[layerName] = layerContent
     return hp, nnParams
 
@@ -88,7 +92,10 @@ def constructOneLayer(layerName, layerContent):
         elif normalizeType == "in":
             return InstanceNorm(num_features)
         elif normalizeType == "ln":
-            return nn.LayerNorm()
+            shape = layerContent['normalize.dataOutShape']
+            shape = tuple(map(int, shape.split(',')[2:]))
+            shape = (num_features, *shape)
+            return nn.LayerNorm(shape)
         else:
             raise ValueError("Parameter `normalizeType` cannot be resolved!")
 
@@ -120,18 +127,19 @@ def constructOneLayer(layerName, layerContent):
         raise Exception("xml configuration error!")
 
     # add the activation fucntion layer
-    activeParam = None
-    if type(layerContent["activate"]) is dict:
-        activeParam = layerContent["activate"]["attribute"]
-        layerContent["activate"] = layerContent["activate"]["value"]
+    # activeParam = None
+    # if type(layerContent["activate"]) is dict:
+    #     activeParam = layerContent["activate"]["attribute"]
+    #     layerContent["activate"] = layerContent["activate"]["value"]
 
     if layerContent["activate"] == "sigmoid":
         layer.add_module("activate", nn.Sigmoid())
     elif layerContent["activate"] == "relu":
         layer.add_module("activate", nn.ReLU())
     elif layerContent["activate"] == "leakyrelu":
-        if activeParam is not None:
-            layer.add_module("activate", nn.LeakyReLU(activeParam))
+        if "activate.param" in layerContent.keys():
+            param = float(layerContent["activate.param"])
+            layer.add_module("activate", nn.LeakyReLU(param))
         else:
             layer.add_module("activate", nn.LeakyReLU())
     elif layerContent["activate"] == "tanh":

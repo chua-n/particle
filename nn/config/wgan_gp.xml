@@ -22,7 +22,7 @@
             <stride>2</stride>
             <padding>1</padding>
             <bias>true</bias>
-            <normalize>in</normalize>
+            <normalize dataOutShape="N,C,32,32,32">ln</normalize>
             <activate param="0.2">leakyrelu</activate>
         </conv>
 
@@ -34,7 +34,7 @@
             <stride>2</stride>
             <padding>1</padding>
             <bias>true</bias>
-            <normalize>in</normalize>
+            <normalize dataOutShape="N,C,16,16,16">ln</normalize>
             <activate param="0.2">leakyrelu</activate>
         </conv>
 
@@ -46,7 +46,7 @@
             <stride>2</stride>
             <padding>1</padding>
             <bias>true</bias>
-            <normalize>in</normalize>
+            <normalize dataOutShape="N,C,8,8,8">ln</normalize>
             <activate param="0.2">leakyrelu</activate>
         </conv>
 
@@ -58,7 +58,7 @@
             <stride>2</stride>
             <padding>1</padding>
             <bias>true</bias>
-            <normalize>in</normalize>
+            <normalize dataOutShape="N,C,4,4,4">ln</normalize>
             <activate param="0.2">leakyrelu</activate>
         </conv>
 
