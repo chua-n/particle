@@ -2,16 +2,17 @@
 <nn xmlns="nju.chuan.nn"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nju.chuan.nn ./nn.xsd">
     <hp>
-        <nEpoch>400</nEpoch>
+        <nEpoch>200</nEpoch>
         <bs>64</bs>
         <lr>0.0002</lr>
         <nLatent>64</nLatent>
-        <iterD>1</iterD>
+        <iterD>3</iterD>
+        <iterG>2</iterG>
         <lambda>10</lambda>
     </hp>
     <nnLayer>
         <!-- ndf=16 -->
-        <!-- ngf=16 -->
+        <!-- ngf=32 -->
 
         <!-- Discriminator -->
         <!-- 1 * 64 * 64 * 64 -->
@@ -80,7 +81,7 @@
         <!-- nLatent * 1 * 1 * 1 -->
         <convT dim="3d" id="1">
             <in_channels>64</in_channels>
-            <out_channels>128</out_channels>
+            <out_channels>256</out_channels>
             <kernel_size>4</kernel_size>
             <stride>1</stride>
             <padding>0</padding>
@@ -92,8 +93,8 @@
 
         <!-- (ngf * 8) * 4 * 4 * 4 -->
         <convT dim="3d" id="2">
-            <in_channels>128</in_channels>
-            <out_channels>64</out_channels>
+            <in_channels>256</in_channels>
+            <out_channels>128</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -105,8 +106,8 @@
 
         <!-- (ngf * 4) * 8 * 8 * 8 -->
         <convT dim="3d" id="3">
-            <in_channels>64</in_channels>
-            <out_channels>32</out_channels>
+            <in_channels>128</in_channels>
+            <out_channels>64</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -118,8 +119,8 @@
 
         <!-- (ngf * 2) * 16 * 16 * 16 -->
         <convT dim="3d" id="4">
-            <in_channels>32</in_channels>
-            <out_channels>16</out_channels>
+            <in_channels>64</in_channels>
+            <out_channels>32</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -131,7 +132,7 @@
 
         <!-- ngf * 32 * 32 * 32 -->
         <convT dim="3d" id="5">
-            <in_channels>16</in_channels>
+            <in_channels>32</in_channels>
             <out_channels>1</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
