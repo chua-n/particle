@@ -96,14 +96,15 @@ def train(net_D, net_G, train_set, device, img_dir="output/wgan_cp/process", ckp
 
             # (2) Update G network: maximize log(D(G(z)))
             if (i + 1) % hp['iterD'] == 0 or (i + 1) == len(train_set):
-                net_G.zero_grad()
-                # Since we just updated D, perform another forward pass of all-fake batch through D
-                noise = torch.randn(x.size(0), hp['nLatent'], device=device)
-                fake = net_G(noise)
-                score_G = net_D(fake).mean(0).view(1)
-                loss_G = -score_G
-                loss_G.backward()
-                optim_G.step()
+                for _ in hp['iterG']:
+                    net_G.zero_grad()
+                    # Since we just updated D, perform another forward pass of all-fake batch through D
+                    noise = torch.randn(x.size(0), hp['nLatent'], device=device)
+                    fake = net_G(noise)
+                    score_G = net_D(fake).mean(0).view(1)
+                    loss_G = -score_G
+                    loss_G.backward()
+                    optim_G.step()
 
             if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
                 logger.info("[Epoch {}/{}] [Step {}/{}] [w_dist: {:.4f}] [score_G: {:.4f}]".format(

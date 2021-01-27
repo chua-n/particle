@@ -124,15 +124,16 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
 
             # (2) Update G network: maximize log(D(G(z)))
             if (i + 1) % hp['iterD'] == 0 or (i + 1) == len(train_set):
-                net_G.zero_grad()
-                # fake labels are real for generator cost
-                label.fill_(real_label)
-                # Since we just updated D, perform another forward pass of all-fake batch through D
-                judgement = net_D(fake)
-                loss_G = criterion(judgement, label)
-                loss_G.backward()
-                D_G_z2 = judgement.mean().item()
-                optim_G.step()
+                for _ in range(hp['iterG']):
+                    net_G.zero_grad()
+                    # fake labels are real for generator cost
+                    label.fill_(real_label)
+                    # Since we just updated D, perform another forward pass of all-fake batch through D
+                    judgement = net_D(fake)
+                    loss_G = criterion(judgement, label)
+                    loss_G.backward()
+                    D_G_z2 = judgement.mean().item()
+                    optim_G.step()
 
             if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
                 logger.info("[Epoch {}/{}] [Step {}/{}] [loss_D: {:.4f}] [loss_G: {:.4f}] [D(x): {:.4f}] [D(G(z)): {:.4f}/{:.4f}]".

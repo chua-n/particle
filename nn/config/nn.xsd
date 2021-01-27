@@ -24,6 +24,7 @@
             <xs:element name="lr" type="xs:float" />
             <xs:element name="nLatent" type="xs:unsignedByte" minOccurs="0"/>
             <xs:element name="iterD" type="xs:unsignedInt" minOccurs="0"/>
+            <xs:element name="iterG" type="xs:unsignedInt" default="1" minOccurs="0"/>
             <xs:element name="clip" type="xs:float" minOccurs="0"/>
             <xs:element name="lambda" type="xs:float" minOccurs="0"/>
             <xs:any minOccurs="0"/>

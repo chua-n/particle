@@ -139,9 +139,9 @@ def constructOneLayer(layerName, layerContent):
     elif layerContent["activate"] == "leakyrelu":
         if "activate.param" in layerContent.keys():
             param = float(layerContent["activate.param"])
-            layer.add_module("activate", nn.LeakyReLU(param))
+            layer.add_module("activate", nn.LeakyReLU(param, inplace=True))
         else:
-            layer.add_module("activate", nn.LeakyReLU())
+            layer.add_module("activate", nn.LeakyReLU(inplace=True))
     elif layerContent["activate"] == "tanh":
         layer.add_module("activate", nn.Tanh())
     elif layerContent["activate"] == "null":
