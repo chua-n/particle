@@ -1,5 +1,5 @@
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="nju.chuan.nn"
-    xmlns="nju.chuan.nn" elementFormDefault="qualified">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="nn.chuan.nju"
+    xmlns="nn.chuan.nju" elementFormDefault="qualified">
     <xs:element name="nn">
         <xs:complexType>
             <xs:all>
@@ -17,31 +17,105 @@
         </xs:complexType>
     </xs:element>
 
+    <!-- ###################以下为超参数元素定义################### -->
+
     <xs:complexType name="hyperParameter">
         <xs:sequence>
             <xs:element name="nEpoch" type="xs:unsignedInt" />
             <xs:element name="bs" type="xs:unsignedInt" />
-            <xs:element name="lr" type="xs:float" />
-            <xs:element name="nLatent" type="xs:unsignedByte" minOccurs="0"/>
-            <xs:element name="iterD" type="xs:unsignedInt" minOccurs="0"/>
-            <xs:element name="iterG" type="xs:unsignedInt" default="1" minOccurs="0"/>
-            <xs:element name="clip" type="xs:float" minOccurs="0"/>
-            <xs:element name="lambda" type="xs:float" minOccurs="0"/>
-            <xs:any minOccurs="0"/>
+
+            <xs:choice>
+                <xs:element name="lr" type="xs:float" />
+                <!-- for GAN -->
+                <xs:sequence>
+                    <xs:element name="lrD" type="xs:float"/>
+                    <xs:element name="lrG" type="xs:float"/>
+                </xs:sequence>
+            </xs:choice>
+
+            <xs:choice minOccurs="0">
+                <!-- for general GAN or VAE -->
+                <xs:element name="nLatent" type="xs:unsignedByte"/>
+                <!-- for infoGAN -->
+                <xs:sequence>
+                    <xs:element name="nNoise" type="xs:unsignedInt"/>
+                    <xs:element name="nDisc" type="xs:unsignedInt"/>
+                    <xs:element name="nCont" type="xs:unsignedInt"/>
+                </xs:sequence>
+            </xs:choice>
+
+            <!-- for GAN -->
+            <xs:sequence minOccurs="0">
+                <xs:element name="iterD" type="xs:unsignedInt"/>
+                <xs:element name="iterG" type="xs:unsignedInt" default="1"/>
+            </xs:sequence>
+
+            <!-- for wGAN -->
+            <xs:choice minOccurs="0">
+                <!-- for wGAN-CP -->
+                <xs:element name="clip" type="xs:float"/>
+                <!-- for wGAN-GP -->
+                <xs:element name="lambda" type="xs:float"/>
+            </xs:choice>
+
+            <!-- <xs:any minOccurs="0"/> -->
+
         </xs:sequence>
     </xs:complexType>
+
+    <!-- 下面`gan`, `wgan`, `infogan`元素的定义先写在这儿，但实际没有使用它们 -->
+
+    <xs:complexType name="gan">
+        <xs:sequence>
+            <xs:element name="nLatent" type="xs:unsignedByte"/>
+            <xs:element name="lrD" type="xs:float"/>
+            <xs:element name="lrG" type="xs:float"/>
+            <xs:element name="iterD" type="xs:unsignedInt"/>
+            <xs:element name="iterG" type="xs:unsignedInt" default="1"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="wgan">
+        <xs:complexContent>
+            <xs:extension base="gan">
+                <xs:choice>
+                    <xs:element name="clip" type="xs:float"/>
+                    <xs:element name="lambda" type="xs:float"/>
+                </xs:choice>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <xs:complexType name="infogan">
+        <xs:sequence>
+            <xs:element name="nNoise" type="xs:unsignedInt"/>
+            <xs:element name="nDisc" type="xs:unsignedInt"/>
+            <xs:element name="nCont" type="xs:unsignedInt"/>
+            <xs:element name="lrD" type="xs:float"/>
+            <xs:element name="lrG" type="xs:float"/>
+            <xs:element name="iterD" type="xs:unsignedInt"/>
+            <xs:element name="iterG" type="xs:unsignedInt" default="1"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ###################以上超参数元素的定义到此结束################### -->
+
+    <!-- ###################以下为网络层元素定义################### -->
+
+    <xs:attribute name="id" type="xs:string"/>
 
     <xs:complexType name="fullyConnected">
         <xs:sequence>
             <xs:element name="in_features" type="xs:unsignedInt" />
             <xs:element name="out_features" type="xs:unsignedInt" />
             <xs:element name="bias" type="xs:boolean" />
-            <xs:element name="normalize" type="normalization" />
+            <xs:element name="normalize" type="normalizationLayer" />
             <xs:element name="activate" type="activateFunc" />
         </xs:sequence>
         <xs:attribute name="dim" type="dim" use="required" fixed="1d"/>
         <xs:attribute name="block" type="xs:string" use="optional"/>
-        <xs:attribute name="id" type="xs:unsignedByte" use="required" />
+        <!-- <xs:attribute ref="id" use="required"/> -->
+        <xs:attribute name="id" type="xs:string" use="required" />
     </xs:complexType>
 
     <xs:complexType name="convolution">
@@ -52,7 +126,7 @@
             <xs:element name="stride" type="xs:unsignedByte" />
             <xs:element name="padding" type="xs:unsignedByte" />
             <xs:element name="bias" type="xs:boolean" />
-            <xs:element name="normalize" type="normalization" />
+            <xs:element name="normalize" type="normalizationLayer" />
             <xs:element name="activate" type="activateFunc" />
         </xs:sequence>
         <xs:attribute name="dim" type="dim" use="required"/>
@@ -69,7 +143,7 @@
             <xs:element name="padding" type="xs:unsignedByte" />
             <xs:element name="output_padding" type="xs:unsignedByte" default="0" />
             <xs:element name="bias" type="xs:boolean" />
-            <xs:element name="normalize" type="normalization" />
+            <xs:element name="normalize" type="normalizationLayer" />
             <xs:element name="activate" type="activateFunc" />
         </xs:sequence>
         <xs:attribute name="dim" type="dim" use="required"/>
@@ -77,7 +151,7 @@
         <xs:attribute name="id" type="xs:unsignedByte" use="required" />
     </xs:complexType>
 
-    <xs:simpleType name="normalizationBase">
+    <xs:simpleType name="normalizationType">
         <xs:restriction base="xs:string">
             <xs:enumeration value="null"/>
             <xs:enumeration value="bn"/>
@@ -86,9 +160,9 @@
         </xs:restriction>
     </xs:simpleType>
 
-    <xs:complexType name="normalization">
+    <xs:complexType name="normalizationLayer">
         <xs:simpleContent>
-            <xs:extension base="normalizationBase">
+            <xs:extension base="normalizationType">
                 <xs:attribute name="dataOutShape" type="xs:string" default="N,C,D,H,W" use="optional"/>
             </xs:extension>
         </xs:simpleContent>
@@ -103,7 +177,7 @@
         </xs:restriction>
     </xs:simpleType>
 
-    <xs:simpleType name="activateFuncBase">
+    <xs:simpleType name="activateFuncType">
         <xs:restriction base="xs:string">
             <xs:enumeration value="null"/>
             <xs:enumeration value="sigmoid"/>
@@ -115,7 +189,7 @@
 
     <xs:complexType name="activateFunc">
         <xs:simpleContent>
-            <xs:extension base="activateFuncBase">
+            <xs:extension base="activateFuncType">
                 <xs:attribute name="param" type="xs:decimal" use="optional"/>
             </xs:extension>
         </xs:simpleContent>

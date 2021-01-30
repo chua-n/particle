@@ -125,6 +125,8 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
             # (2) Update G network: maximize log(D(G(z)))
             if (i + 1) % hp['iterD'] == 0 or (i + 1) == len(train_set):
                 for _ in range(hp['iterG']):
+                    noise = torch.randn(x.size(0), hp['nLatent'], device=device)
+                    fake = net_G(noise)
                     net_G.zero_grad()
                     # fake labels are real for generator cost
                     label.fill_(real_label)

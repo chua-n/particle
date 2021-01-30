@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<nn xmlns="nju.chuan.nn"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nju.chuan.nn ./nn.xsd">
+<nn xmlns="nn.chuan.nju"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nn.chuan.nju ./nn.xsd">
     <hp>
         <nEpoch>100</nEpoch>
         <bs>64</bs>
         <lr>0.0002</lr>
         <nLatent>64</nLatent>
-        <iterD>2</iterD>
-        <iterG>1</iterG>
+        <iterD>1</iterD>
+        <iterG>2</iterG>
     </hp>
     <nnLayer>
         <!-- ndf=16 -->

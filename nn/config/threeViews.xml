@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<nn xmlns="nju.chuan.nn"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nju.chuan.nn ./nn.xsd">
+<nn xmlns="nn.chuan.nju"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nn.chuan.nju ./nn.xsd">
     <hp>
         <nEpoch>60</nEpoch>
         <bs>128</bs>
