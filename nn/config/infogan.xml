@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nn xmlns="nn.chuan.nju"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nn.chuan.nju ./nn.xsd">
+    <hp>
+        <nEpoch>10</nEpoch>
+        <bs>64</bs>
+        <lrD>0.0002</lrD>
+        <lrG>0.001</lrG>
+        <nNoise>54</nNoise>
+        <nDisc>3</nDisc>
+        <nCont>7</nCont>
+        <iterD>1</iterD>
+        <iterG>1</iterG>
+    </hp>
+
+
+    <nnLayer>
+        <!-- ngf=64 -->
+        <!-- ndf=64 -->
+
+        <convT dim="3d" id="1" block="Generator">
+            <in_channels>64</in_channels>
+            <out_channels>512</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>1</stride>
+            <padding>0</padding>
+            <output_padding>0</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <convT dim="3d" id="2" block="Generator">
+            <in_channels>512</in_channels>
+            <out_channels>256</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <output_padding>0</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <convT dim="3d" id="3" block="Generator">
+            <in_channels>256</in_channels>
+            <out_channels>128</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <output_padding>0</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <convT dim="3d" id="4" block="Generator">
+            <in_channels>128</in_channels>
+            <out_channels>64</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <output_padding>0</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <convT dim="3d" id="5" block="Generator">
+            <in_channels>64</in_channels>
+            <out_channels>1</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <output_padding>0</output_padding>
+            <bias>false</bias>
+            <normalize>null</normalize>
+            <activate>sigmoid</activate>
+        </convT>
+
+        <conv dim="3d" id="1" block="Share">
+            <in_channels>1</in_channels>
+            <out_channels>64</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <bias>false</bias>
+            <normalize>null</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
+
+        <conv dim="3d" id="2" block="Share">
+            <in_channels>64</in_channels>
+            <out_channels>128</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
+
+        <conv dim="3d" id="3" block="Share">
+            <in_channels>128</in_channels>
+            <out_channels>256</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
+
+        <conv dim="3d" id="4" block="Share">
+            <in_channels>256</in_channels>
+            <out_channels>512</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate param="0.2">leakyrelu</activate>
+        </conv>
+
+        <conv dim="3d" id="5" block="Discriminator">
+            <in_channels>512</in_channels>
+            <out_channels>1</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>1</stride>
+            <padding>0</padding>
+            <bias>false</bias>
+            <normalize>null</normalize>
+            <activate>sigmoid</activate>
+        </conv>
+
+        <conv dim="3d" id="5" block="Q">
+            <in_channels>512</in_channels>
+            <out_channels>128</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>1</stride>
+            <padding>0</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>leakyrelu</activate>
+        </conv>
+
+        <!-- <fc dim="1d" id="disc" block="Q">
+            <in_features>128</in_features>
+            <out_features>10</out_features>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </fc>
+
+        <fc dim="1d" id="cont_mu" block="Q">
+            <in_features>128</in_features>
+            <out_features>2</out_features>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </fc>
+
+        <fc dim="1d" id="cont_var" block="Q">
+            <in_features>128</in_features>
+            <out_features>2</out_features>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </fc> -->
+    </nnLayer>
+</nn>
