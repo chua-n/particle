@@ -41,14 +41,21 @@ def makeGrid(images: Union[np.ndarray, List[np.ndarray]],
     """
     from torchvision.utils import save_image
 
+    try:
+        # 对于numpy的一些图片数组，torch.from_numpy(image) 会发生异常————PyTorch的奇哉怪也
+        torch.from_numpy(images[0])
+    except ValueError:
+        images = images.copy() if isinstance(images, np.ndarray) else [
+            img.copy() for img in images]
+
     # get the batch, height, width, channel
     b = len(images)
     h, w, c = images[0].shape
     tensors = torch.empty((b, c, h, w), dtype=torch.float32)
     for i, image in enumerate(images):
         for j in range(c):
-            # torch.from_numpy(image) 会发生异常，PyTorch的奇哉怪也
             tensors[i, j] = torch.from_numpy(image[:, :, j])
+
     save_image(tensors, filename, nrow=nrow, normalize=normalize)
     return
 
