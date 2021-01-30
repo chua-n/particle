@@ -195,10 +195,10 @@ def train(source_path='data/train_set.npy',
     #     net.apply(weights_init)
 
     # build optimizer and loss function
-    optim_D = torch.optim.Adam([{"params": net_Share.parameters()}, {
-        "params": net_D.parameters()}], lr=hp['lrD'], betas=(0.5, 0.999))
-    optim_G = torch.optim.Adam([{"params": net_G.parameters()}, {
-        "params": net_Q.parameters()}], lr=hp['lrG'], betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam([{"params": net_Share.parameters()}, {"params": net_D.parameters()}],
+                               lr=hp['lrD'], betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam([{"params": net_G.parameters()}, {"params": net_Q.parameters()}],
+                               lr=hp['lrG'], betas=(0.5, 0.999))
     criterion_D = nn.BCELoss()
     criterion_disc = nn.CrossEntropyLoss()
     criterion_cont = NormalNLLLoss()  # log_gaussian()
@@ -295,7 +295,7 @@ def train(source_path='data/train_set.npy',
                     mlab.close()
                     batchImage.append(img)
                 makeGrid(batchImage, os.path.join(img_dir, f'{epoch+1}-fixed_z{i+1}.png'),
-                         nrow=len(batchImage)/hp['nDisc'])
+                         nrow=len(batchImage)//hp['nDisc'])
         net_G.train()
     logger.info("Train finished!")
 
