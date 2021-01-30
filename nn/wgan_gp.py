@@ -1,19 +1,21 @@
 import os
+import numpy as np
+from mayavi import mlab
 
 import torch
-from mayavi import mlab
+from torch import nn
 from torch import autograd
+from torch.utils.data import TensorDataset, DataLoader
+
 from particle.pipeline import Sand
 from particle.utils.log import setLogger
 from particle.utils.config import constructOneLayer, parseConfig
-from torch import nn
 
 
 class Critic(nn.Module):
     def __init__(self, xml):
         super().__init__()
-        hp, nnParams = parseConfig(xml)
-        self.hp = hp
+        _, nnParams = parseConfig(xml)
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("conv-"):
                 self.add_module(
@@ -31,7 +33,7 @@ class Generator(nn.Module):
     def __init__(self, xml):
         super().__init__()
         hp, nnParams = parseConfig(xml)
-        self.hp = hp
+        self.nLatent = hp['nLatent']
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("convT-"):
                 self.add_module(
@@ -69,10 +71,10 @@ def compute_gradient_penalty(net_D, real_samples, fake_samples):
     return gradient_penalty
 
 
-def generate(net_G, vector):
+def generate(net_G: Generator, vector):
     net_G = net_G.cpu()
     net_G.eval()
-    if vector.shape == (net_G.hp['nLatent'],):
+    if vector.shape == (net_G.nLatent):
         vector.unsqueeze_(dim=0)
 
     with torch.no_grad():
@@ -82,22 +84,36 @@ def generate(net_G, vector):
     return cubes
 
 
-def train(net_D, net_G, train_set, device, img_dir="output/wgan_gp/process", ckpt_dir="output/wgan_gp", log_dir="output/wgan_gp"):
-    logger = setLogger("wgan_gp", log_dir)
-    ckpt_dir = os.path.abspath(ckpt_dir)
-    img_dir = os.path.abspath(img_dir)
-    assert net_D.hp == net_G.hp, "The hyperparameters in Discriminator and Generator are supposed to be the same."
-    hp = net_D.hp
-    logger.critical(f"\n{hp}")
-    net_D = net_D.to(device)
-    net_G = net_G.to(device)
-    logger.critical(f"\n{net_D}")
-    logger.critical(f"\n{net_G}")
+def train(source_path='data/train_set.npy',
+          xml="particle/nn/config/wgan_gp.xml",
+          device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+          img_dir="output/wgan_gp/process",
+          ckpt_dir="output/wgan_gp",
+          log_dir="output/wgan_gp"):
 
+    # build train set
+    hp, _ = parseConfig(xml)
+    source = torch.from_numpy(np.load(source_path))
+    train_set = DataLoader(TensorDataset(source),
+                           batch_size=hp['bs'], shuffle=True)
+
+    # build nn model
+    net_D = Critic(xml).to(device)
+    net_G = Generator(xml).to(device)
+
+    # build optimizer
     optim_D = torch.optim.Adam(
         net_D.parameters(), lr=hp['lr'], betas=(0.5, 0.999))
     optim_G = torch.optim.Adam(
         net_G.parameters(), lr=hp['lr'], betas=(0.5, 0.999))
+
+    # set output settings
+    logger = setLogger("wgan_gp", log_dir)
+    ckpt_dir = os.path.abspath(ckpt_dir)
+    img_dir = os.path.abspath(img_dir)
+    logger.critical(f"\n{hp}")
+    logger.critical(f"\n{net_D}")
+    logger.critical(f"\n{net_G}")
 
     # Create a batch of latent vectors that we will use to visualize the progression of the generator
     fixed_noise = torch.randn(5, hp['nLatent'], device=device)
@@ -126,7 +142,8 @@ def train(net_D, net_G, train_set, device, img_dir="output/wgan_gp/process", ckp
                 for _ in range(hp['iterG']):
                     net_G.zero_grad()
                     # Since we just updated D, perform another forward pass of all-fake batch through D
-                    noise = torch.randn(x.size(0), hp['nLatent'], device=device)
+                    noise = torch.randn(
+                        x.size(0), hp['nLatent'], device=device)
                     fake = net_G(noise)
                     score_G = net_D(fake).mean()
                     loss_G = -score_G

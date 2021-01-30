@@ -1,18 +1,20 @@
 import os
 
+import numpy as np
 import torch
+from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
+
 from mayavi import mlab
 from particle.pipeline import Sand
 from particle.utils.log import setLogger
 from particle.utils.config import constructOneLayer, parseConfig
-from torch import nn
 
 
 class Discriminator(nn.Module):
     def __init__(self, xmlFile):
         super().__init__()
-        hp, nnParams = parseConfig(xmlFile)
-        self.hp = hp
+        _, nnParams = parseConfig(xmlFile)
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("conv-"):
                 self.add_module(
@@ -40,7 +42,7 @@ class Generator(nn.Module):
     def __init__(self, xmlFile):
         super().__init__()
         hp, nnParams = parseConfig(xmlFile)
-        self.hp = hp
+        self.nLatent = hp['nLatent']
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("convT-"):
                 self.add_module(
@@ -65,7 +67,7 @@ class Generator(nn.Module):
 def generate(net_G, vector):
     net_G = net_G.cpu()
     net_G.eval()
-    if vector.shape == (net_G.hp['nLatent'],):
+    if vector.shape == (net_G.nLatent):
         vector.unsqueeze_(dim=0)
 
     with torch.no_grad():
@@ -74,24 +76,42 @@ def generate(net_G, vector):
     return cubes
 
 
-def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_dir="output/dcgan", ckpt_dir="output/dcgan"):
-    logger = setLogger("dcgan", log_dir)
-    ckpt_dir = os.path.abspath(ckpt_dir)
-    img_dir = os.path.abspath(img_dir)
-    assert net_D.hp == net_G.hp, "The hyperparameters in Discriminator and Generator are supposed to be the same."
-    hp = net_D.hp
-    logger.critical(f"\n{hp}")
-    net_D = net_D.to(device)
-    net_G = net_G.to(device)
-    logger.critical(f"\n{net_D}")
-    logger.critical(f"\n{net_G}")
+def train(source_path='data/train_set.npy',
+          xml="particle/nn/config/dcgan.xml",
+          device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+          img_dir="output/dcgan/process",
+          log_dir="output/dcgan",
+          ckpt_dir="output/dcgan"):
+
+    # build train set
+    hp, _ = parseConfig(xml)
+    source = torch.from_numpy(np.load(source_path))
+    train_set = DataLoader(TensorDataset(
+        source), batch_size=hp['bs'], shuffle=True)
+
+    # build nn model
+    net_D = Discriminator(xml).to(device)
+    net_G = Generator(xml).to(device)
+    # net_D.weights_init()
+    # net_G.weights_init()
+
+    # build optimizer
     optim_D = torch.optim.Adam(
         net_D.parameters(), lr=hp['lr'], betas=(0.5, 0.999))
     optim_G = torch.optim.Adam(
         net_G.parameters(), lr=hp['lr'], betas=(0.5, 0.999))
 
+    # build loss function
     # 要知道：G是通过优化D来间接提升自己的，故两个网络只需一个loss criterion
     criterion = nn.BCELoss()
+
+    # set output settings
+    logger = setLogger("dcgan", log_dir)
+    ckpt_dir = os.path.abspath(ckpt_dir)
+    img_dir = os.path.abspath(img_dir)
+    logger.critical(f"\n{hp}")
+    logger.critical(f"\n{net_D}")
+    logger.critical(f"\n{net_G}")
 
     # Create a batch of latent vectors that we will use to visualize the progression of the generator
     fixed_noise = torch.randn(5, hp['nLatent'], device=device)
@@ -125,7 +145,8 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
             # (2) Update G network: maximize log(D(G(z)))
             if (i + 1) % hp['iterD'] == 0 or (i + 1) == len(train_set):
                 for _ in range(hp['iterG']):
-                    noise = torch.randn(x.size(0), hp['nLatent'], device=device)
+                    noise = torch.randn(
+                        x.size(0), hp['nLatent'], device=device)
                     fake = net_G(noise)
                     net_G.zero_grad()
                     # fake labels are real for generator cost
@@ -162,3 +183,7 @@ def train(net_D, net_G, train_set, device, img_dir="outout/dcgan/process", log_d
                 mlab.close()
         net_G.train()
     logger.info("Train finished!")
+
+
+if __name__ == "__main__":
+    train()
