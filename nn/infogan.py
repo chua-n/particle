@@ -6,11 +6,11 @@ from particle.mayaviOffScreen import mlab
 import torch
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
-from torchvision.utils import save_image
 
 from particle.pipeline import Sand
 from particle.utils.config import parseConfig, constructOneLayer
 from particle.utils.log import setLogger
+from particle.utils.plotter import makeGrid
 
 
 class Generator(nn.Module):
@@ -287,18 +287,15 @@ def train(source_path='data/train_set.npy',
                 for cube in cubes:
                     cube = cube[0]  # discard the channel axis
                     sand = Sand(cube)
-                    sand.visualize(voxel=True, glyph='2dcircle',
+                    sand.visualize(voxel=True, glyph='point',
                                    scale_mode='scalar')
                     mlab.outline()
                     mlab.axes()
                     img = mlab.screenshot()
                     mlab.close()
-                    # torch.from_numpy(img) 会发生异常，PyTorch的奇哉怪也
-                    img = torch.tensor(img.copy(), dtype=torch.float32)
-                    img = img.permute(2, 0, 1)
                     batchImage.append(img)
-                save_image(batchImage, os.path.join(img_dir, f'{epoch+1}-fixed_z{i+1}.png'),
-                           nrow=hp['nDisc'])
+                makeGrid(batchImage, os.path.join(img_dir, f'{epoch+1}-fixed_z{i+1}.png'),
+                         nrow=len(batchImage)/hp['nDisc'])
         net_G.train()
     logger.info("Train finished!")
 

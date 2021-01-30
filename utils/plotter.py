@@ -1,4 +1,6 @@
 import random
+from typing import List, Union
+
 import numpy as np
 from skimage.measure import marching_cubes
 import torch
@@ -23,21 +25,30 @@ def fig2array(fig):
     return buf
 
 
-def make_grid(images: np.ndarray, filename: str, nrow: int = 8, normalize: bool = True):
+def makeGrid(images: Union[np.ndarray, List[np.ndarray]],
+             filename: str,
+             nrow: int = 8,
+             normalize: bool = False):
     """Make a grid of images from input `images`.
 
     Parameters:
     -----------
-    images: a batch of images, shape: (B, H, W, C)
-    filename: the name of the image-grid file to be saved"""
+    images: a batch of images whose shape is (H, W, C)
+    filename: the name of the image-grid file to be saved
+    nrow (int, optional): Number of images displayed in each row of the grid
+    normalize (bool, optional): If True, shift the image to the range (0, 1),
+        by the min and max values specified by :attr:`range`. Default: ``False``.
+    """
     from torchvision.utils import save_image
 
     # get the batch, height, width, channel
-    b, h, w, c = images.shape
+    b = len(images)
+    h, w, c = images[0].shape
     tensors = torch.empty((b, c, h, w), dtype=torch.float32)
-    for i in range(b):
+    for i, image in enumerate(images):
         for j in range(c):
-            tensors[i, j] = torch.from_numpy(images[i, :, :, j])
+            # torch.from_numpy(image) 会发生异常，PyTorch的奇哉怪也
+            tensors[i, j] = torch.from_numpy(image[:, :, j])
     save_image(tensors, filename, nrow=nrow, normalize=normalize)
     return
 
