@@ -48,7 +48,7 @@ class Generator(nn.Module):
 def generate(net_G: Generator, vector):
     net_G = net_G.cpu()
     net_G.eval()
-    if vector.shape == (net_G.nLatent):
+    if vector.shape == (net_G.nLatent,):
         vector.unsqueeze_(dim=0)
 
     with torch.no_grad():

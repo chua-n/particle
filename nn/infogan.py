@@ -16,7 +16,8 @@ from particle.utils.plotter import makeGrid
 class Generator(nn.Module):
     def __init__(self, xmlFile):
         super().__init__()
-        _, nnParams = parseConfig(xmlFile)
+        hp, nnParams = parseConfig(xmlFile)
+        self.nLatent = hp['nNoise'] + hp['nDisc'] + hp['nCont']
         for layerType, layerParam in nnParams.items():
             if layerType.startswith("Generator-"):
                 self.add_module(
@@ -123,7 +124,7 @@ class NormalNLLLoss:
         return nll
 
 
-def sample_z(nNoise, nDisc, nCont, bs, device):
+def sample_z(bs, nNoise, nDisc, nCont, device):
     noise = torch.randn(bs, nNoise, device=device)
     # torch.multinomial()?
     # one-hot vectors
@@ -171,6 +172,18 @@ def get_fixed_z(nNoise, nDisc, nCont, device):
     #     (torch.zeros_like(cont_template), cont_template), dim=1).to(device)
     # fixed_z1 = torch.cat((fixed_noise, fixed_disc, fixed_cont1), dim=1)
     # fixed_z2 = torch.cat((fixed_noise, fixed_disc, fixed_cont2), dim=1)
+
+
+def generate(net_G: Generator, vector):
+    net_G = net_G.cpu()
+    net_G.eval()
+    if vector.shape == (net_G.nLatent,):
+        vector.unsqueeze_(dim=0)
+
+    with torch.no_grad():
+        cubes = net_G(vector)
+        cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+    return cubes
 
 
 def train(source_path='data/train_set.npy',
@@ -230,8 +243,8 @@ def train(source_path='data/train_set.npy',
             loss_D_real = criterion_D(judgement_real, label)
             loss_D_real.backward()
             # 判假
-            z = sample_z(hp['nNoise'], hp['nDisc'], hp['nCont'],
-                         x.size(0), device)
+            z = sample_z(x.size(0), hp['nNoise'],
+                         hp['nDisc'], hp['nCont'], device)
             label.fill_(fake_label)
             fake = net_G(z)
             judgement_fake = net_D(net_Share(fake.detach())).view(-1)

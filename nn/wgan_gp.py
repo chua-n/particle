@@ -74,7 +74,7 @@ def compute_gradient_penalty(net_D, real_samples, fake_samples):
 def generate(net_G: Generator, vector):
     net_G = net_G.cpu()
     net_G.eval()
-    if vector.shape == (net_G.nLatent):
+    if vector.shape == (net_G.nLatent,):
         vector.unsqueeze_(dim=0)
 
     with torch.no_grad():
