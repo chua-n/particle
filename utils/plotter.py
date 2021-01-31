@@ -28,7 +28,7 @@ def fig2array(fig):
 def makeGrid(images: Union[np.ndarray, List[np.ndarray]],
              filename: str,
              nrow: int = 8,
-             normalize: bool = False):
+             normalize: bool = True):
     """Make a grid of images from input `images`.
 
     Parameters:
@@ -37,7 +37,7 @@ def makeGrid(images: Union[np.ndarray, List[np.ndarray]],
     filename: the name of the image-grid file to be saved
     nrow (int, optional): Number of images displayed in each row of the grid
     normalize (bool, optional): If True, shift the image to the range (0, 1),
-        by the min and max values specified by :attr:`range`. Default: ``False``.
+        by the min and max values specified by :attr:`range`. Default: ``True``.
     """
     from torchvision.utils import save_image
 
