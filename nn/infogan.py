@@ -183,6 +183,7 @@ def generate(net_G: Generator, vector):
     with torch.no_grad():
         cubes = net_G(vector)
         cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+    cubes = cubes.numpy()
     return cubes
 
 
@@ -300,8 +301,8 @@ def train(source_path='data/train_set.npy',
                 for cube in cubes:
                     cube = cube[0]  # discard the channel axis
                     sand = Sand(cube)
-                    sand.visualize(voxel=True, glyph='point',
-                                   scale_mode='scalar')
+                    # sand.visualize(voxel=True, glyph='sphere')
+                    sand.visualize(realistic=False)
                     mlab.outline()
                     mlab.axes()
                     img = mlab.screenshot()

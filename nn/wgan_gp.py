@@ -79,8 +79,8 @@ def generate(net_G: Generator, vector):
 
     with torch.no_grad():
         cubes = net_G(vector)
-
         cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+    cubes = cubes.numpy()
     return cubes
 
 
