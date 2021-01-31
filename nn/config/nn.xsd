@@ -48,6 +48,8 @@
             <xs:sequence minOccurs="0">
                 <xs:element name="iterD" type="xs:unsignedInt"/>
                 <xs:element name="iterG" type="xs:unsignedInt" default="1"/>
+                <!-- `plotFrequency`定义每多少个epoch画一次生成的颗粒图 -->
+                <xs:element name="plotFrequency" type="xs:unsignedInt" minOccurs="0"/>
             </xs:sequence>
 
             <!-- for wGAN -->

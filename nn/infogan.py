@@ -293,24 +293,24 @@ def train(source_path='data/train_set.npy',
             'optim_G_state_dict': optim_G.state_dict()}, os.path.join(ckpt_dir, 'state_dict.tar'))
         logger.info(f"Model checkpoint has been stored in {ckpt_dir}.")
 
-        net_G.eval()
-        with torch.no_grad():
-            for i, fixed_z in enumerate(fixed_z_list):
-                batchImage = []
-                cubes = net_G(fixed_z).to('cpu').numpy()
-                for cube in cubes:
-                    cube = cube[0]  # discard the channel axis
-                    sand = Sand(cube)
-                    # sand.visualize(voxel=True, glyph='sphere')
-                    sand.visualize(realistic=False)
-                    mlab.outline()
-                    mlab.axes()
-                    img = mlab.screenshot()
-                    mlab.close()
-                    batchImage.append(img)
-                makeGrid(batchImage, os.path.join(img_dir, f'{epoch+1}-fixed_z{i+1}.png'),
-                         nrow=len(batchImage)//hp['nDisc'])
-        net_G.train()
+        if (epoch+1) % hp['plotFrequency'] == 0 or (epoch+1) == hp['nEpoch']:
+            net_G.eval()
+            with torch.no_grad():
+                for i, fixed_z in enumerate(fixed_z_list):
+                    batchImage = []
+                    cubes = net_G(fixed_z).to('cpu').numpy()
+                    for cube in cubes:
+                        cube = cube[0]  # discard the channel axis
+                        sand = Sand(cube)
+                        sand.visualize(voxel=True, glyph='point')
+                        # sand.visualize(realistic=False)
+                        mlab.outline()
+                        img = mlab.screenshot()
+                        mlab.close()
+                        batchImage.append(img)
+                    makeGrid(batchImage, os.path.join(img_dir, f'{epoch+1}-fixed_z{i+1}.png'),
+                             nrow=len(batchImage)//hp['nDisc'], normalize=True)
+            net_G.train()
     logger.info("Train finished!")
 
 

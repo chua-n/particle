@@ -2,7 +2,7 @@
 <nn xmlns="nn.chuan.nju"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nn.chuan.nju ./nn.xsd">
     <hp>
-        <nEpoch>10</nEpoch>
+        <nEpoch>100</nEpoch>
         <bs>64</bs>
         <lrD>0.0002</lrD>
         <lrG>0.001</lrG>
@@ -11,6 +11,7 @@
         <nCont>7</nCont>
         <iterD>1</iterD>
         <iterG>1</iterG>
+        <plotFrequency>5</plotFrequency>
     </hp>
 
 
