@@ -1,3 +1,6 @@
+import time
+from functools import wraps
+
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
@@ -271,6 +274,24 @@ class Circumsphere:
             R, C, _ = cls.B_min_sphere(P_new, B)
             P = np.insert(P_new.copy(), 0, p, axis=0)
         return R, C, P
+
+
+def timer(func):
+    """Decorator that reports the function execution time.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        res = func(*args, **kwargs)
+        end = time.time()
+        timeCost = end - start
+        hour, timeCost = divmod(timeCost, 3600)
+        minute, second = divmod(timeCost, 60)
+        hour, minute, second = int(hour), int(minute), round(second, 1)
+        print(
+            f"Function `{func.__name__}` runs for {hour}h {minute}min {second}s")
+        return res
+    return wrapper
 
 
 if __name__ == '__main__':
