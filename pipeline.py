@@ -4,8 +4,9 @@ import scipy.ndimage as ndi
 from skimage import measure as sm
 from skimage import filters
 from scipy.spatial import ConvexHull
+from skimage.util import img_as_ubyte
 
-from .utils.dirty import sample_labels, Circumsphere
+from .utils.dirty import sample_labels, Circumsphere, timer
 
 
 class Sand:
@@ -292,11 +293,11 @@ class Sand:
         pass
 
 
-class SandHeap:
+class SandHeap0:
 
     """对整个沙土体的处理"""
 
-    def __init__(self, source, cube_size: int = 64):
+    def __init__(self, source, cubeSize: int = 64):
         """
         Attributes:
         -----------
@@ -307,23 +308,23 @@ class SandHeap:
         _heap: just a buffer to get heap and num
         """
 
-        self.source = source
+        self.data = source
         self._heap = self.label()
         self.heap = self._heap[0]
         self.num = self._heap[1]  # 含有颗粒的数量
-        self.cube_size = cube_size
+        self.cubeSize = cubeSize
 
     def label(self, min_size: int = 300, max_size: int = 20000) -> tuple:
-        """对原始二值图像self.source进行连通区域标注，并剔除太小和太大的颗粒。
+        """对原始二值图像self.data进行连通区域标注，并剔除太小和太大的颗粒。
 
         Returns: (labels, num)
         --------
         labels: ndarray of dtype int
             Labeled array, where all connected regions are assigned the same integer value.
             The sand particles will be assigned from 1, the pore will be assigned all 0.
-            Its size is the same with self.source, i.e. a 3-D matrix/tensor.
+            Its size is the same with self.data, i.e. a 3-D matrix/tensor.
 
-            For example, supposing that there are 100 particles in self.source, these corre-
+            For example, supposing that there are 100 particles in self.data, these corre-
             sponding regions in labels will be labeled 1-100 one by one.
         num: int
             Numbers of labels, which equals the maximum label index.
@@ -333,7 +334,7 @@ class SandHeap:
         此处剔除颗粒的过程借鉴了skimage.morphology.remove_small_objects()的GitHub源码。
         """
 
-        heap = sm.label(self.source, connectivity=1)
+        heap = sm.label(self.data, connectivity=1)
         # np.bincount()返回一个非负的整数向量所含数字出现的次数
         region_sizes = np.bincount(heap.ravel())
         too_small, too_big = region_sizes < min_size, region_sizes > max_size
@@ -342,7 +343,7 @@ class SandHeap:
         # 剔除掉这些超出边界的区域
         heap[too_small_mask] = 0
         heap[too_big_mask] = 0
-        return sm.label(heap, connectivity=1, return_num=True)
+        return sm.label(heap, connectivity=2, return_num=True)
 
     def region_centroid(self, label: int) -> tuple:
         """返回某个lable对应的region的中心点坐标。"""
@@ -361,18 +362,18 @@ class SandHeap:
                  target.bbox[5]-target.bbox[2])
         if author == 'chua_n':
             # 目标颗粒对应到cube里的切片索引，将颗粒放置cube中心
-            cube_slices = tuple(slice((self.cube_size - shape[i]) // 2,
-                                      (self.cube_size - shape[i]) // 2 + shape[i])
+            cube_slices = tuple(slice((self.cubeSize - shape[i]) // 2,
+                                      (self.cubeSize - shape[i]) // 2 + shape[i])
                                 for i in range(3))
-            cube = np.zeros((self.cube_size,)*3, dtype=np.bool)
+            cube = np.zeros((self.cubeSize,)*3, dtype=np.bool)
             cube[cube_slices] = self.heap[slices]
             return cube.astype(np.uint8)
 
         elif author == 'wei':
             indices_bbox = np.nonzero(self.heap[slices] == label)
-            indices_cube = tuple(indices_bbox[i] + (self.cube_size - shape[i]) // 2
+            indices_cube = tuple(indices_bbox[i] + (self.cubeSize - shape[i]) // 2
                                  for i in range(3))
-            cube = np.zeros((self.cube_size,)*3, dtype=np.uint8)
+            cube = np.zeros((self.cubeSize,)*3, dtype=np.uint8)
             cube[indices_cube] = 1
             return cube
 
@@ -385,3 +386,320 @@ class SandHeap:
         regions = sm.regionprops(self.heap)
         target = regions[label-1]
         return target.coords
+
+
+class SandHeap:
+    """对整个沙土体的处理流程——从CT扫描图到单颗粒提取。
+    """
+
+    def __init__(self, source: str = "/media/chuan/000935950005A663/liutao/ct-images/",
+                 se: np.array = ndi.generate_binary_structure(rank=3, connectivity=2),
+                 connectivity: int = 1,
+                 persistencePath: str = "./data/liutao/",
+                 cubeSize: int = 64
+                 ):
+        """
+        Parameters:
+        -----------
+        source: path of input source data
+        se: structure element for morphological openrations
+        connectivity: pixel connectivity for watershed segment and particle extraction.
+            Default 1 is because its accuracy in practice, `connectivity=2` performs 
+            unexpectedly bad.
+        persistencePath: path to save calculated important data permanently
+        cubeSize: size of the cube to contain a soil particle
+
+        Attributes:
+        -----------
+        """
+        self.status = None
+        self._loadData(source)  # get `self.data`
+        self._getCircleMask()  # get `self.circleMask`
+        self.se = se
+        self.connectivity = connectivity
+        self.persistencePath = persistencePath
+        self.cubeSize = cubeSize
+        self._distance = None
+        self._markers = None
+        self.preSegmented = None
+        self.finalSegmented = None
+
+    def setStatus(self, name):
+        assert name in {"data-loaded", "histogram-equalized", "filtered",
+                        "contrast-enhanced", "binary-segmented", "binary-opened",
+                        "holes-filled", "distance-calculated", "markers-calculated",
+                        "pre-segmented", "final-segmented"}
+        self.status = name
+
+    def checkStatus(name):
+        from functools import wraps
+
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                self = args[0]  # 先用这种奇葩的用法，后续再了解怎么获取self以及应用在非实例方法
+                if isinstance(name, str) and self.status != name:
+                    assert False, f"Action Error! The function `{func.__name__}` shouldn't " \
+                        f"be executed when status is not {name}, make the status correct!\n" \
+                        f"`{func.__name__}` has exited without execution!"
+                elif isinstance(name, list) and self.status not in name:
+                    assert False, f"Action Error! The function `{func.__name__}` shouldn't "\
+                        f"be executed when status does not belong to {name}, make the status correct!\n" \
+                        f"`{func.__name__}` has exited without execution!"
+                else:
+                    res = func(*args, **kwargs)
+                    return res
+            return wrapper
+        return decorator
+
+    @timer
+    def _loadData(self, source: str):
+        assert source is None or os.path.isdir(
+            source) or source.endswith(".npy")
+        if source is None:
+            self.data = None
+            return
+        elif os.path.isdir(source):
+            from skimage import io
+            cwd = os.getcwd()
+            os.chdir(source)
+            files = os.listdir()
+            files.sort(key=lambda filename: int(filename.split('.')[0]))
+            sample = io.imread(files[0])
+            self.data = np.empty(
+                (len(files), *sample.shape), dtype=sample.dtype)
+            for i, file in enumerate(files):
+                self.data[i] = io.imread(file)
+            os.chdir(cwd)
+        else:
+            self.data = np.load(source)
+        self.setStatus("data-loaded")
+
+    def _getCircleMask(self):
+        if self.data is None:
+            self.circleMask = None
+            return
+        from skimage import draw
+        sample = self.data[0]
+        h, w = sample.shape
+        assert h == w
+        size = h
+        circleMask = np.zeros_like(sample, dtype=bool)
+        rr, cc = draw.disk((size/2, size/2), size/2, shape=sample.shape)
+        circleMask[rr, cc] = True
+        pln = self.data.shape[0]  # 扩展出pln维度
+        circleMask = np.expand_dims(circleMask, 0).repeat(pln, axis=0)
+        self.circleMask = circleMask
+
+    def drawHistogram(self, nbins=255):
+        print("Now plotting the histogram...")
+        import matplotlib.pyplot as plt
+        n, bins, patches = plt.hist(self.data[self.circleMask], bins=nbins)
+        return n, bins, patches
+
+    @timer
+    @checkStatus("data-loaded")
+    def equalizeHist(self, nbins=255, draw=False):
+        from skimage import exposure
+        res = exposure.equalize_hist(
+            self.data, nbins=nbins, mask=self.circleMask)
+        self.data = img_as_ubyte(res)
+        self.setStatus("histogram-equalized")
+        if draw:
+            self.drawHistogram(nbins=nbins)
+
+    @timer
+    @checkStatus(["data-loaded", "histogram-equalized"])
+    def filter(self, method="median", package="ndimage", draw=False, persistence=True):
+        assert method in ("median", "mean") and \
+            package in ("ndimage", "skimage")
+        if package == "ndimage":
+            if method == "median":
+                ndi.median_filter(self.data, size=3,
+                                  mode="constant", cval=0, output=self.data)
+            else:
+                ndi.uniform_filter(self.data, size=3,
+                                   mode="constant", cval=0, output=self.data)
+        else:
+            if method == "median":
+                filters.rank.median(self.data, selem=self.se,
+                                    mask=self.circleMask, out=self.data)
+            else:
+                filters.rank.mean(self.data, selem=self.se,
+                                  mask=self.circleMask, out=self.data)
+        self.setStatus("filtered")
+        if persistence:
+            np.save(os.path.join(self.persistencePath,
+                                 self.status+".npy"), self.data)
+        if draw:
+            self.drawHistogram()
+
+    @timer
+    @checkStatus("filtered")
+    def enhanceContrast(self, draw=False, persistence=True):
+        filters.rank.enhance_contrast(
+            self.data, selem=self.se, out=self.data, mask=self.circleMask)
+
+        self.setStatus("contrast-enhanced")
+        if persistence:
+            np.save(os.path.join(self.persistencePath,
+                                 self.status+".npy"), self.data)
+        if draw:
+            self.drawHistogram()
+
+    @timer
+    @checkStatus(["contrast-enhanced", "filtered"])
+    def binarySegmentation(self, threshold=108):
+        mask = self.data > threshold
+        self.data = self.data.astype(bool)
+        self.data[mask] = True
+        self.data[~mask] = False
+        self.setStatus("binary-segmented")
+        return
+
+    @timer
+    @checkStatus("binary-segmented")
+    def binaryOpening(self, iters=1):
+        ndi.binary_opening(self.data, structure=self.se,
+                           iterations=iters, mask=self.circleMask, output=self.data)
+        self.setStatus("binary-opened")
+        return
+
+    @timer
+    @checkStatus("binary-opened")
+    def binaryFillHoles(self):
+        ndi.binary_fill_holes(self.data, structure=self.se, output=self.data)
+        self.setStatus("holes-filled")
+        return
+
+    @timer
+    @checkStatus("holes-filled")
+    def _distanceForWatershed(self, pinch=True, persistence=True):
+        self.circleMask = None
+        self._distance = ndi.distance_transform_edt(self.data)
+        if pinch:  # 压缩内存占用
+            self._distance = self._distance.astype(np.float32)
+        if persistence:
+            np.save(os.path.join(self.persistencePath,
+                                 "distance.npy"), self._distance)
+        self.setStatus("distance-calculated")
+
+    @timer
+    @checkStatus("distance-calculated")
+    def _markersForWatershed(self, min_distance=7, pinch=True, persistence=True):
+        self.circleMask = None
+        distance = self._distance
+
+        from skimage.feature import peak_local_max
+        coords = peak_local_max(distance, min_distance=min_distance,
+                                labels=self.data)
+        mask = np.zeros(distance.shape, dtype=bool)
+        mask[tuple(coords.T)] = True
+        self._markers = sm.label(mask, connectivity=self.connectivity)
+        if pinch:  # 压缩内存占用
+            self._markers = self._markers.astype(np.int32)
+        if persistence:
+            np.save(os.path.join(self.persistencePath,
+                                 "markers.npy"), self._markers)
+        self.setStatus("markers-calculated")
+
+    @timer
+    @checkStatus(["holes-filled", "distance-calculated", "markers-calculated"])
+    def watershedSegmentation(self, min_distance=7, persistence=True):
+        # assert method in ("distance", "gradient")
+        self.circleMask = None
+        from skimage.segmentation import watershed
+        if self._distance is None:
+            self._distanceForWatershed()
+        if self._markers is None:
+            self._markersForWatershed(min_distance)
+
+        segmented = watershed(-self._distance, self._markers,
+                              mask=self.data, watershed_line=True)
+        print(
+            f"After preliminary watershed-segmentation, found {segmented.max()} regions.")
+        segmented = segmented.astype(bool)
+        self._distance = None
+        self._markers = None
+        self.preSegmented = segmented
+        self.setStatus("pre-segmented")
+        if persistence:
+            np.save(os.path.join(self.persistencePath,
+                                 self.status+".npy"), segmented)
+
+    @timer
+    @checkStatus("pre-segmented")
+    def removeBigSegmentationFace(self, mode="2d", threshold=20, connectivity=None, persistence=True, returnDiagram=False):
+        self.circleMask = None
+        from skimage import img_as_ubyte
+        import matplotlib.pyplot as plt
+        segmentationFace = img_as_ubyte(
+            self.data) - img_as_ubyte(self.preSegmented)
+        if mode == "3d":
+            labeledFace, num = sm.label(segmentationFace, return_num=True,
+                                        connectivity=self.connectivity if connectivity is None else connectivity)
+            print(
+                f"The pre-segmented image has initially {num} segmentation faces.")
+            regions = sm.regionprops(labeledFace)
+            inds = [i for i, region in enumerate(regions)
+                    if region.area >= threshold]
+            print(f"{len(inds)} segmentation faces will be removed!")
+            for i in inds:
+                coords = tuple(regions[i].coords.T)
+                segmentationFace[coords] = 0
+            print("Removal completes!")
+        elif mode == "2d":
+            from tqdm import tqdm
+            initNum = removalNum = 0
+            for i, crossSection in tqdm(enumerate(segmentationFace)):
+                labeledLine, n = sm.label(
+                    crossSection, return_num=True, connectivity=2)
+                initNum += n
+                regions = sm.regionprops(labeledLine)
+                inds = [i for i, region in enumerate(regions)
+                        if region.area >= threshold]
+                removalNum += len(inds)
+                for ind in inds:
+                    coords = tuple(regions[ind].coords.T)
+                    segmentationFace[i][coords] = 0
+            print(
+                f"The pre-segmented image has initially {initNum} segmentation lines totally.")
+            print(f"{removalNum} segmentation lines have been removed!")
+        else:
+            raise ValueError("Parameter `mode` should be either '2D' or '3D'.")
+
+        segmented = self.data + segmentationFace
+        self.finalSegmented = segmented
+        self.setStatus("final-segmented")
+        if persistence:
+            np.save(os.path.join(self.persistencePath,
+                                 self.status+".npy"), segmented)
+        if returnDiagram:
+            areas = [region.area for region in regions]
+            areasAfterRemoval = [region.area for region in regions
+                                 if region.area < threshold]
+            fig, ax = plt.subplots(1, 2, figsize=(12, 9))
+            ax[0].violinplot(areas, showextrema=False)
+            ax[0].set(title="Total Segmentation Faces", ylabel="voxels")
+            ax[1].violinplot(areasAfterRemoval, showextrema=False)
+            ax[1].set(title="Segmentation Faces After Removal", ylabel="voxels")
+            return fig
+
+    @timer
+    @checkStatus("final-segmented")
+    def putIntoCube(self) -> np.ndarray:
+        self.circleMask = None
+        """将每一个颗粒分别提取到cube里。"""
+        labeledImage, num = sm.label(
+            self.finalSegmented, return_num=True, connectivity=self.connectivity)
+        cubes = np.zeros((num, self.cubeSize, self.cubeSize, self.cubeSize),
+                         dtype=bool)
+        regions = sm.regionprops(labeledImage)
+        for i, region in enumerate(regions):
+            particle = region.image
+            particleShape = np.array(particle.shape)
+            initialIndex = (self.cubeSize - particleShape) // 2
+            cubes[i][initialIndex[0]:initialIndex[0]+particle.shape[0],
+                     initialIndex[1]:initialIndex[1]+particle.shape[1],
+                     initialIndex[2]:initialIndex[2]+particle.shape[2]] = particle
+        return cubes
