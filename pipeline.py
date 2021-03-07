@@ -510,23 +510,24 @@ class SandHeap:
 
     @timer
     @checkStatus(["data-loaded", "histogram-equalized"])
-    def filter(self, method="median", package="ndimage", draw=False, persistence=True):
-        assert method in ("median", "mean") and \
+    def filter(self, mode="median", cycle=1, package="ndimage", draw=False, persistence=True):
+        assert mode in ("median", "mean") and \
             package in ("ndimage", "skimage")
-        if package == "ndimage":
-            if method == "median":
-                ndi.median_filter(self.data, size=3,
-                                  mode="constant", cval=0, output=self.data)
+        for _ in range(cycle):
+            if package == "ndimage":
+                if mode == "median":
+                    ndi.median_filter(self.data, size=3,
+                                      mode="constant", cval=0, output=self.data)
+                else:
+                    ndi.uniform_filter(self.data, size=3,
+                                       mode="constant", cval=0, output=self.data)
             else:
-                ndi.uniform_filter(self.data, size=3,
-                                   mode="constant", cval=0, output=self.data)
-        else:
-            if method == "median":
-                filters.rank.median(self.data, selem=self.se,
-                                    mask=self.circleMask, out=self.data)
-            else:
-                filters.rank.mean(self.data, selem=self.se,
-                                  mask=self.circleMask, out=self.data)
+                if mode == "median":
+                    filters.rank.median(self.data, selem=self.se,
+                                        mask=self.circleMask, out=self.data)
+                else:
+                    filters.rank.mean(self.data, selem=self.se,
+                                      mask=self.circleMask, out=self.data)
         self.setStatus("filtered")
         if persistence:
             np.save(os.path.join(self.persistencePath,
@@ -574,10 +575,17 @@ class SandHeap:
 
     @timer
     @checkStatus("holes-filled")
-    def _distanceForWatershed(self, pinch=True, persistence=True):
+    def _distanceForWatershed(self, mode="cdt", metric="chessboard", pinch=True, persistence=True):
         self.circleMask = None
-        self._distance = ndi.distance_transform_edt(self.data)
-        if pinch:  # 压缩内存占用
+        if mode == "cdt":
+            self._distance = ndi.distance_transform_cdt(
+                self.data, metric=metric)
+        elif mode == "edt":
+            self._distance = ndi.distance_transform_edt(self.data)
+        else:
+            raise ValueError(
+                "Parameter `mode` should be either 'cdt' or 'edt'!")
+        if pinch and mode == "edt":  # 压缩内存占用
             self._distance = self._distance.astype(np.float32)
         if persistence:
             np.save(os.path.join(self.persistencePath,
@@ -684,6 +692,27 @@ class SandHeap:
             ax[1].violinplot(areasAfterRemoval, showextrema=False)
             ax[1].set(title="Segmentation Faces After Removal", ylabel="voxels")
             return fig
+
+    @staticmethod
+    def removeBoundaryLabels(labeled, inplace=True):
+        img = labeled
+        boundaryLabels = set()
+        index = [slice(None) for _ in range(img.ndim)]
+        for dim in range(img.ndim):
+            for boundarySlice in [slice(1), slice(-1, None)]:
+                index[dim] = boundarySlice
+                for val in np.unique(img[tuple(index)].ravel()):
+                    if val != 0:
+                        boundaryLabels.add(val)
+            index[dim] = slice(None)
+        res = img if inplace else img.copy()
+        for label in boundaryLabels:
+            mask = res != label
+            res[:] *= mask
+            # 比下面的写法更鲁棒些，因为不知道背景元素的值，可能不是0
+            # mask = res == label
+            # res[mask] = 0
+        return res
 
     @timer
     @checkStatus("final-segmented")
