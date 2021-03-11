@@ -1,13 +1,13 @@
 import os
 import numpy as np
-from particle.mayaviOffScreen import mlab
-# from mayavi import mlab
+from mayavi import mlab
 
 import torch
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
 from particle.pipeline import Sand
+from particle.utils.dirty import loadNnData
 from particle.utils.config import parseConfig, constructOneLayer
 from particle.utils.log import setLogger
 from particle.utils.plotter import makeGrid
@@ -187,7 +187,7 @@ def generate(net_G: Generator, vector):
     return cubes
 
 
-def train(source_path='data/train_set.npy',
+def train(source_path='data/liutao/v1/particles.npz',
           xml="particle/nn/config/infogan.xml",
           device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
           img_dir="output/infogan/process",
@@ -196,7 +196,7 @@ def train(source_path='data/train_set.npy',
 
     # build train set
     hp, _ = parseConfig(xml)
-    source = torch.from_numpy(np.load(source_path))
+    source = loadNnData(source_path, 'trainSet')
     train_set = DataLoader(TensorDataset(
         source), batch_size=hp['bs'], shuffle=True)
 
@@ -240,7 +240,7 @@ def train(source_path='data/train_set.npy',
             x = x.to(dtype=torch.float, device=device)
             label = torch.full((x.size(0),), real_label,
                                device=device, dtype=torch.float)
-            judgement_real = net_D(net_Share(x)).view(-1)
+            judgement_real = net_D(net_Share(x))
             loss_D_real = criterion_D(judgement_real, label)
             loss_D_real.backward()
             # 判假
@@ -248,7 +248,7 @@ def train(source_path='data/train_set.npy',
                          hp['nDisc'], hp['nCont'], device)
             label.fill_(fake_label)
             fake = net_G(z)
-            judgement_fake = net_D(net_Share(fake.detach())).view(-1)
+            judgement_fake = net_D(net_Share(fake.detach()))
             loss_D_fake = criterion_D(judgement_fake, label)
             loss_D_fake.backward()
             # 综合
@@ -267,7 +267,7 @@ def train(source_path='data/train_set.npy',
                     loss_reconstruct = criterion_D(judgement, label)
                     # update Q part
                     q_disc, q_cont_mu, q_cont_var = net_Q(share_out)
-                    disc = z[:, hp['nNoise']: hp['nNoise'] + hp['nDisc']]
+                    disc = z[:, hp['nNoise']:hp['nNoise']+hp['nDisc']]
                     # torch.max(disc, 1)[1]是nn.CrossEntropyLoss()的target
                     loss_disc = criterion_disc(q_disc, torch.max(disc, 1)[1])
                     cont = z[:, -hp['nCont']:]
@@ -315,4 +315,5 @@ def train(source_path='data/train_set.npy',
 
 
 if __name__ == "__main__":
+    torch.manual_seed(3.14)
     train()

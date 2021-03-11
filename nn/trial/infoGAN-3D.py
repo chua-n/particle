@@ -8,7 +8,7 @@ from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.utils import save_image
 
-from particle.utils.plotter import fig2array
+from particle.utils.plotter import fig2array, makeGrid
 
 ngf = 64  # generator feature map size
 ndf = 64  # discriminator feature map size
@@ -188,7 +188,7 @@ BETA1 = 0.5
 BETA2 = 0.999
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-source_path = '../VAE/data/train_set.npy'
+source_path = './data/train_set.npy'
 source = torch.from_numpy(np.load(source_path))   # device(type='cpu')
 train_set = DataLoader(TensorDataset(source), batch_size=BS, shuffle=True)
 
@@ -245,7 +245,8 @@ for epoch in range(N_EPOCH):
         optim_D.zero_grad()
         # 判真
         x = x.to(dtype=torch.float, device=device)
-        label = torch.full((x.size(0),), real_label, device=device)
+        label = torch.full((x.size(0),), real_label,
+                           device=device, dtype=torch.float)
         judgement_real = net_D(net_Share(x)).view(-1)
         loss_D_real = criterion_D(judgement_real, label)
         loss_D_real.backward()
@@ -264,7 +265,7 @@ for epoch in range(N_EPOCH):
         optim_G.zero_grad()
         share_out = net_Share(fake)
         # update Generator part
-        judgement = net_D(share_out)
+        judgement = net_D(share_out).view(-1)
         label.fill_(real_label)
         # treat fake data as real
         loss_G_reconstruct = criterion_D(judgement, label)
@@ -307,8 +308,8 @@ for epoch in range(N_EPOCH):
                 ax.scatter(x, y, z, s=val)
                 buffer = fig2array(fig)
                 buffers.append(buffer)
-            save_image(
-                buffers, './2020.02.20-3D/{}-fixed_z{}.png'.format(epoch + 1, i + 1), nrow=N_DISC)
+            makeGrid(
+                buffers, './output/infogan/process/{}-fixed_z{}.png'.format(epoch + 1, i + 1), nrow=N_DISC, normalize=True)
 
 # Plot the training losses.
 plt.figure(figsize=(10, 5))

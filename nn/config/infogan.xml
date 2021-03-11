@@ -6,9 +6,9 @@
         <bs>64</bs>
         <lrD>0.0002</lrD>
         <lrG>0.001</lrG>
-        <nNoise>54</nNoise>
-        <nDisc>3</nDisc>
-        <nCont>7</nCont>
+        <nNoise>62</nNoise>
+        <nDisc>6</nDisc>
+        <nCont>5</nCont>
         <iterD>1</iterD>
         <iterG>1</iterG>
         <plotFrequency>5</plotFrequency>
@@ -20,7 +20,7 @@
         <!-- ndf=64 -->
 
         <convT dim="3d" id="1" block="Generator">
-            <in_channels>64</in_channels>
+            <in_channels>73</in_channels>
             <out_channels>512</out_channels>
             <kernel_size>4</kernel_size>
             <stride>1</stride>
@@ -142,7 +142,8 @@
             <padding>0</padding>
             <bias>false</bias>
             <normalize>bn</normalize>
-            <activate>leakyrelu</activate>
+            <!-- 训练不出来的问题1：没有0.2 -->
+            <activate param="0.2">leakyrelu</activate>
         </conv>
 
         <!-- <fc dim="1d" id="disc" block="Q">

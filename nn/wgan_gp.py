@@ -8,6 +8,7 @@ from torch import autograd
 from torch.utils.data import TensorDataset, DataLoader
 
 from particle.pipeline import Sand
+from particle.utils.dirty import loadNnData
 from particle.utils.log import setLogger
 from particle.utils.config import constructOneLayer, parseConfig
 
@@ -84,7 +85,7 @@ def generate(net_G: Generator, vector):
     return cubes
 
 
-def train(source_path='data/train_set.npy',
+def train(source_path='data/liutao/v1/particles.npz',
           xml="particle/nn/config/wgan_gp.xml",
           device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
           img_dir="output/wgan_gp/process",
@@ -93,7 +94,7 @@ def train(source_path='data/train_set.npy',
 
     # build train set
     hp, _ = parseConfig(xml)
-    source = torch.from_numpy(np.load(source_path))
+    source = loadNnData(source_path, 'trainSet')
     train_set = DataLoader(TensorDataset(source),
                            batch_size=hp['bs'], shuffle=True)
 

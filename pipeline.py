@@ -1,8 +1,12 @@
 import os
 import numpy as np
+
 import scipy.ndimage as ndi
-from skimage import measure as sm
-from skimage import filters
+from skimage import filters, exposure, measure, morphology
+from skimage.feature import peak_local_max
+from skimage.segmentation import watershed
+
+import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
 from skimage.util import img_as_ubyte
 
@@ -28,9 +32,32 @@ class Sand:
         self._faces = None
         self._convexHull = None
 
-    def get_border_coord(self):
-        """获得一个颗粒在cube中的边界坐标，包括内外边界"""
-        pass
+    def getBorder(self, connectivity=1, toCoords=False):
+        """获得一个颗粒在cube中的边界元素，可返回图像形式或坐标形式。
+
+        Parameters:
+        -----------
+        connectivity (int): 可以从1变化到3，3代表self.cube.ndim
+        toCoords (bool): 选择是否返回坐标形式的边界元素
+
+        Returns: 
+        --------
+        返回类型为np.array。
+            1) 如果`toCoords=False`，数组的形状与self.cube相同，依然是图像格式；
+            2) 如果`toCoords=True`，数组的形状为(n, 3)，每一行表示一个边界点的(x,y,z)坐标。
+        """
+        se = ndi.generate_binary_structure(3, connectivity)
+        inner = morphology.binary_erosion(self.cube, selem=se)
+        border = self.cube - inner
+        if toCoords:
+            property = measure.regionprops(border)[0]
+            centroid = property.centroid
+            coords = property.coords
+            # 向坐标原点平移，以质心为原点
+            coords = coords - centroid
+            return coords
+        else:
+            return border
 
     def point_cloud(self) -> np.ndarray:
         """转化为点云，尚不知有何用
@@ -74,8 +101,8 @@ class Sand:
         if cube is None:
             cube = self.cube
         # 只保留前两个参数
-        self._verts, self._faces, *_ = sm.marching_cubes(cube, level,
-                                                         method='lewiner')
+        self._verts, self._faces, *_ = measure.marching_cubes(cube, level,
+                                                              method='lewiner')
         return self._verts, self._faces
 
     def visualize(self, cube: np.ndarray = None, figure=None,
@@ -248,7 +275,7 @@ class Sand:
     def surf_area(self) -> float:
         """计算沙土颗粒的表面积"""
         verts, faces = self.surface(level=0)
-        area = sm.mesh_surface_area(verts, faces)
+        area = measure.mesh_surface_area(verts, faces)
         self._area = area
         return area
 
@@ -293,101 +320,6 @@ class Sand:
         pass
 
 
-class SandHeap0:
-
-    """对整个沙土体的处理"""
-
-    def __init__(self, source, cubeSize: int = 64):
-        """
-        Attributes:
-        -----------
-        source: input source data
-        heap: labeled 3-D image matrix/tensor
-        num: number of particles contained in source
-
-        _heap: just a buffer to get heap and num
-        """
-
-        self.data = source
-        self._heap = self.label()
-        self.heap = self._heap[0]
-        self.num = self._heap[1]  # 含有颗粒的数量
-        self.cubeSize = cubeSize
-
-    def label(self, min_size: int = 300, max_size: int = 20000) -> tuple:
-        """对原始二值图像self.data进行连通区域标注，并剔除太小和太大的颗粒。
-
-        Returns: (labels, num)
-        --------
-        labels: ndarray of dtype int
-            Labeled array, where all connected regions are assigned the same integer value.
-            The sand particles will be assigned from 1, the pore will be assigned all 0.
-            Its size is the same with self.data, i.e. a 3-D matrix/tensor.
-
-            For example, supposing that there are 100 particles in self.data, these corre-
-            sponding regions in labels will be labeled 1-100 one by one.
-        num: int
-            Numbers of labels, which equals the maximum label index.
-
-        Note:
-        -----
-        此处剔除颗粒的过程借鉴了skimage.morphology.remove_small_objects()的GitHub源码。
-        """
-
-        heap = sm.label(self.data, connectivity=1)
-        # np.bincount()返回一个非负的整数向量所含数字出现的次数
-        region_sizes = np.bincount(heap.ravel())
-        too_small, too_big = region_sizes < min_size, region_sizes > max_size
-        # 找到对应的掩码（mask）索引
-        too_small_mask, too_big_mask = too_small[heap], too_big[heap]
-        # 剔除掉这些超出边界的区域
-        heap[too_small_mask] = 0
-        heap[too_big_mask] = 0
-        return sm.label(heap, connectivity=2, return_num=True)
-
-    def region_centroid(self, label: int) -> tuple:
-        """返回某个lable对应的region的中心点坐标。"""
-
-        regions = sm.regionprops(self.heap)
-        return regions[label-1].centroid
-
-    def get_cube(self, label: int, author: str = 'chua_n') -> np.ndarray:
-        """将标签为label的颗粒提取到一个cube里。"""
-
-        regions = sm.regionprops(self.heap)
-        target = regions[label-1]  # 获取目标颗粒
-        slices = target.slice  # 目标颗粒在self.heap里的切片索引
-        shape = (target.bbox[3]-target.bbox[0],
-                 target.bbox[4]-target.bbox[1],
-                 target.bbox[5]-target.bbox[2])
-        if author == 'chua_n':
-            # 目标颗粒对应到cube里的切片索引，将颗粒放置cube中心
-            cube_slices = tuple(slice((self.cubeSize - shape[i]) // 2,
-                                      (self.cubeSize - shape[i]) // 2 + shape[i])
-                                for i in range(3))
-            cube = np.zeros((self.cubeSize,)*3, dtype=np.bool)
-            cube[cube_slices] = self.heap[slices]
-            return cube.astype(np.uint8)
-
-        elif author == 'wei':
-            indices_bbox = np.nonzero(self.heap[slices] == label)
-            indices_cube = tuple(indices_bbox[i] + (self.cubeSize - shape[i]) // 2
-                                 for i in range(3))
-            cube = np.zeros((self.cubeSize,)*3, dtype=np.uint8)
-            cube[indices_cube] = 1
-            return cube
-
-        else:
-            print("Please choose a correct author, chua_n or wei ???")
-
-    def cloud(self, label: int) -> np.ndarray:
-        """获取颗粒在heap中的点云坐标形式，返回的array形状为 N × 3"""
-
-        regions = sm.regionprops(self.heap)
-        target = regions[label-1]
-        return target.coords
-
-
 class SandHeap:
     """对整个沙土体的处理流程——从CT扫描图到单颗粒提取。
     """
@@ -395,6 +327,7 @@ class SandHeap:
     def __init__(self, source: str = "/media/chuan/000935950005A663/liutao/ct-images/",
                  se: np.array = ndi.generate_binary_structure(rank=3, connectivity=2),
                  connectivity: int = 1,
+                 ratio: float = 1,
                  persistencePath: str = "./data/liutao/",
                  cubeSize: int = 64
                  ):
@@ -414,7 +347,7 @@ class SandHeap:
         """
         self.status = None
         self._loadData(source)  # get `self.data`
-        self._getCircleMask()  # get `self.circleMask`
+        self._getCircleMask(ratio)  # get `self.circleMask`
         self.se = se
         self.connectivity = connectivity
         self.persistencePath = persistencePath
@@ -475,7 +408,7 @@ class SandHeap:
             self.data = np.load(source)
         self.setStatus("data-loaded")
 
-    def _getCircleMask(self):
+    def _getCircleMask(self, ratio=1):
         if self.data is None:
             self.circleMask = None
             return
@@ -484,8 +417,9 @@ class SandHeap:
         h, w = sample.shape
         assert h == w
         size = h
+        diameter = size * ratio
         circleMask = np.zeros_like(sample, dtype=bool)
-        rr, cc = draw.disk((size/2, size/2), size/2, shape=sample.shape)
+        rr, cc = draw.disk((size/2, size/2), diameter/2, shape=sample.shape)
         circleMask[rr, cc] = True
         pln = self.data.shape[0]  # 扩展出pln维度
         circleMask = np.expand_dims(circleMask, 0).repeat(pln, axis=0)
@@ -493,14 +427,13 @@ class SandHeap:
 
     def drawHistogram(self, nbins=255):
         print("Now plotting the histogram...")
-        import matplotlib.pyplot as plt
         n, bins, patches = plt.hist(self.data[self.circleMask], bins=nbins)
+        print("Plotting Complete!")
         return n, bins, patches
 
     @timer
     @checkStatus("data-loaded")
     def equalizeHist(self, nbins=255, draw=False):
-        from skimage import exposure
         res = exposure.equalize_hist(
             self.data, nbins=nbins, mask=self.circleMask)
         self.data = img_as_ubyte(res)
@@ -510,7 +443,7 @@ class SandHeap:
 
     @timer
     @checkStatus(["data-loaded", "histogram-equalized"])
-    def filter(self, mode="median", cycle=1, package="ndimage", draw=False, persistence=True):
+    def filter(self, mode="median", cycle=3, package="ndimage", draw=False, persistence=True):
         assert mode in ("median", "mean") and \
             package in ("ndimage", "skimage")
         for _ in range(cycle):
@@ -585,6 +518,8 @@ class SandHeap:
         else:
             raise ValueError(
                 "Parameter `mode` should be either 'cdt' or 'edt'!")
+        # 已经证明distance使用np.float64或np.float32对后续的计算丝毫不影响
+        # 所以为了节省空间、提高计算效率，还是开启pinch选项使用float32吧
         if pinch and mode == "edt":  # 压缩内存占用
             self._distance = self._distance.astype(np.float32)
         if persistence:
@@ -597,13 +532,11 @@ class SandHeap:
     def _markersForWatershed(self, min_distance=7, pinch=True, persistence=True):
         self.circleMask = None
         distance = self._distance
-
-        from skimage.feature import peak_local_max
         coords = peak_local_max(distance, min_distance=min_distance,
                                 labels=self.data)
         mask = np.zeros(distance.shape, dtype=bool)
         mask[tuple(coords.T)] = True
-        self._markers = sm.label(mask, connectivity=self.connectivity)
+        self._markers = measure.label(mask, connectivity=self.connectivity)
         if pinch:  # 压缩内存占用
             self._markers = self._markers.astype(np.int32)
         if persistence:
@@ -614,9 +547,10 @@ class SandHeap:
     @timer
     @checkStatus(["holes-filled", "distance-calculated", "markers-calculated"])
     def watershedSegmentation(self, min_distance=7, persistence=True):
+        """注：这里的分水岭分割内部使用的其实是“1级连通”，正好符合了我的主动设定`self.connectivity=1`。
+        """
         # assert method in ("distance", "gradient")
         self.circleMask = None
-        from skimage.segmentation import watershed
         if self._distance is None:
             self._distanceForWatershed()
         if self._markers is None:
@@ -626,7 +560,7 @@ class SandHeap:
                               mask=self.data, watershed_line=True)
         print(
             f"After preliminary watershed-segmentation, found {segmented.max()} regions.")
-        segmented = segmented.astype(bool)
+        segmented = segmented.astype(bool)  # 选择节省空间否？
         self._distance = None
         self._markers = None
         self.preSegmented = segmented
@@ -637,18 +571,16 @@ class SandHeap:
 
     @timer
     @checkStatus("pre-segmented")
-    def removeBigSegmentationFace(self, mode="2d", threshold=20, connectivity=None, persistence=True, returnDiagram=False):
+    def removeBigSegmentationFace(self, mode="3d", threshold=300, connectivity=None, persistence=True, returnDiagram=False):
         self.circleMask = None
-        from skimage import img_as_ubyte
-        import matplotlib.pyplot as plt
         segmentationFace = img_as_ubyte(
             self.data) - img_as_ubyte(self.preSegmented)
         if mode == "3d":
-            labeledFace, num = sm.label(segmentationFace, return_num=True,
-                                        connectivity=self.connectivity if connectivity is None else connectivity)
+            labeledFace, num = measure.label(segmentationFace, return_num=True,
+                                             connectivity=2 if connectivity is None else connectivity)
             print(
                 f"The pre-segmented image has initially {num} segmentation faces.")
-            regions = sm.regionprops(labeledFace)
+            regions = measure.regionprops(labeledFace)
             inds = [i for i, region in enumerate(regions)
                     if region.area >= threshold]
             print(f"{len(inds)} segmentation faces will be removed!")
@@ -660,10 +592,10 @@ class SandHeap:
             from tqdm import tqdm
             initNum = removalNum = 0
             for i, crossSection in tqdm(enumerate(segmentationFace)):
-                labeledLine, n = sm.label(
+                labeledLine, n = measure.label(
                     crossSection, return_num=True, connectivity=2)
                 initNum += n
-                regions = sm.regionprops(labeledLine)
+                regions = measure.regionprops(labeledLine)
                 inds = [i for i, region in enumerate(regions)
                         if region.area >= threshold]
                 removalNum += len(inds)
@@ -694,6 +626,7 @@ class SandHeap:
             return fig
 
     @staticmethod
+    @timer  # @classmethod与@staticmethod装饰器必须置于顶层
     def removeBoundaryLabels(labeled, inplace=True):
         img = labeled
         boundaryLabels = set()
@@ -712,18 +645,18 @@ class SandHeap:
             # 比下面的写法更鲁棒些，因为不知道背景元素的值，可能不是0
             # mask = res == label
             # res[mask] = 0
-        return res
+        return None if inplace else res
 
     @timer
     @checkStatus("final-segmented")
     def putIntoCube(self) -> np.ndarray:
         self.circleMask = None
         """将每一个颗粒分别提取到cube里。"""
-        labeledImage, num = sm.label(
+        labeledImage, num = measure.label(
             self.finalSegmented, return_num=True, connectivity=self.connectivity)
         cubes = np.zeros((num, self.cubeSize, self.cubeSize, self.cubeSize),
                          dtype=bool)
-        regions = sm.regionprops(labeledImage)
+        regions = measure.regionprops(labeledImage)
         for i, region in enumerate(regions):
             particle = region.image
             particleShape = np.array(particle.shape)

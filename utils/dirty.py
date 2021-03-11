@@ -8,6 +8,13 @@ from scipy.spatial import ConvexHull
 import torch
 
 
+def loadNnData(sourcePath, keyword: str = None) -> torch.Tensor:
+    if sourcePath.endswith('.npy'):
+        return torch.from_numpy(np.load(sourcePath))
+    elif sourcePath.endswith('.npz'):
+        return torch.from_numpy(np.load(sourcePath)[keyword])
+
+
 def sample_labels(size: int, lim: list, seed: int = None) -> np.ndarray:
     """What's meaning of sample_labels?"""
     if seed:
