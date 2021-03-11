@@ -26,7 +26,7 @@ def parseLog(logFile, key_word):
             indBegin = line.find(key_word)
             if indBegin == -1:
                 continue
-            indBegin += len(key_word) + 1  # 加1是因为冒号
+            indBegin += len(key_word)
             indEnd = line.find(']', indBegin)
             values.append(float(line[indBegin:indEnd]))
     return values

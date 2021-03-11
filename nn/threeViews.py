@@ -128,7 +128,7 @@ def train(model: Reconstructor, train_set, test_set, device):
             optim.step()
             losses.append(loss.item())
             if (i + 1) % 10 == 0 or (i + 1) == len(train_set):
-                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_re: {:.4f}]".
+                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_re {:.4f}]".
                             format(epoch+1, model.hp["nEpoch"], i+1, len(train_set), loss.item()))
 
         # 评估在测试集上的损失

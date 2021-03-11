@@ -160,7 +160,7 @@ def train(source_path='data/liutao/v1/particles.npz',
                     optim_G.step()
 
             if (i + 1) % (5*hp['iterD']) == 0 or (i + 1) == len(train_set):
-                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_D: {:.4f}] [loss_G: {:.4f}] [D(x): {:.4f}] [D(G(z)): {:.4f}/{:.4f}]".
+                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_D {:.4f}] [loss_G {:.4f}] [D(x) {:.4f}] [D(G(z)) {:.4f}/{:.4f}]".
                             format(epoch + 1, hp["nEpoch"], i + 1, len(train_set), loss_D.item(), loss_G.item(), D_x, D_G_z1, D_G_z2))
 
         # 每轮结束保存一次模型参数
