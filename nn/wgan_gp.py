@@ -1,5 +1,4 @@
 import os
-import numpy as np
 from mayavi import mlab
 
 import torch
