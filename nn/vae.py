@@ -214,6 +214,7 @@ def train(sourcePath='data/liutao/v1/particles.npz',
     logger.critical(f"\n{hp}")
     logger.critical(f"\n{vae}")
 
+    lastTestLoss = float("inf")
     for epoch in range(hp['nEpoch']):
         vae.train()
         for i, (x,) in enumerate(trainSet):
@@ -228,7 +229,6 @@ def train(sourcePath='data/liutao/v1/particles.npz',
                             format(epoch + 1, hp["nEpoch"], i + 1, len(trainSet), loss_re.item(), loss_kl.item(), loss.item()))
         vae.eval()
         logger.info("Model is running on the test set...")
-        lastTestLoss = 1  # 初始值只要比一开始的testLoss大即可
         with torch.no_grad():
             testLoss_re = testLoss_kl = testLoss = 0
             for (x,) in testSet:
@@ -255,14 +255,8 @@ def train(sourcePath='data/liutao/v1/particles.npz',
 
 
 if __name__ == "__main__":
-    vae = Vae("./particle/nn/config/vae.xml")
-    vae.load_state_dict(torch.load('./output/vae/state_dict.pt'))
-    cube = vae.generate()
-    from particle.pipeline import Sand
-    from mayavi import mlab
-    Sand(cube).visualize()
-    mlab.show()
+    # vae = Vae("./particle/nn/config/vae.xml")
     # print(vae)
     # x = torch.rand(100, 1, 64, 64, 64)
     # assert vae(x)[0].size() == x.size()
-    # train()
+    train()
