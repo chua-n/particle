@@ -173,9 +173,9 @@ class Vae(nn.Module):
         cubes(np.array): (64, 64, 64) or (*, 64, 64 ,64)
         """
 
-        if coding is None:
-            coding = torch.randn(1, self.n_latent)
         decoder = self.decoder.cpu()
+        if coding is None:
+            coding = torch.randn(1, decoder.nLatent)
         if coding.shape == (decoder.nLatent,):
             coding.unsqueeze_(dim=0)
         self.eval()
@@ -255,8 +255,14 @@ def train(sourcePath='data/liutao/v1/particles.npz',
 
 
 if __name__ == "__main__":
-    # vae = Vae("./particle/nn/config/vae.xml")
+    vae = Vae("./particle/nn/config/vae.xml")
+    vae.load_state_dict(torch.load('./output/vae/state_dict.pt'))
+    cube = vae.generate()
+    from particle.pipeline import Sand
+    from mayavi import mlab
+    Sand(cube).visualize()
+    mlab.show()
     # print(vae)
     # x = torch.rand(100, 1, 64, 64, 64)
     # assert vae(x)[0].size() == x.size()
-    train()
+    # train()
