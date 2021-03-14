@@ -1,214 +1,135 @@
+import os
+
 import torch
-import torch.nn as nn
+from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.functional as F
 
+from particle.utils.dirty import loadNnData
+from particle.utils.log import setLogger
+from particle.utils.config import parseConfig, constructOneLayer
 
-class VAE(nn.Module):
-    def __init__(self, n_latent=32, lamb=1, lr=1e-3, batch_norm=True, mode='train'):
-        """VAE 模型类实例初始化函数，定义了各神经网络层的架构。
 
-        Parameters:
-        -----------
-        n_latent(int): 隐变量空间的维数
-        lamb(float): 损失函数中KL距离所占的权重
-        lr(float): learning rate, 设定的初始的学习率
-        batch_norm(bool): 是否使用批量归一化
-        mode(str, 'train' or 'test'): 训练模式或测试模式（因为据说测试集时不能开启batch_norm等，会有区别）
+def setSeed(seed, strict=False):
+    """Set the random number seed for PyTorch, so that the results may be 
+    reproduced if you want.
 
-        Note:
-        -----
-        按照 PyTorch 官方源码的一个示例，根据 Python 类语法，原来网络权重（和偏置）的初始化过程
-            也可以放到此__init__函数中来，这样会使得在构造一个类实例的时候会自动完成你设置的初始
-            化参数过程。即，现在所采用的版本中，方法initialize()的定义内容可直接放到__init__
-            定义里的下方。"""
+    Parameters:
+    -----------
+    seed(int): The desired seed.
+    strict(bool, optional): If False, you can reproduce your work on CPU
+        completely, but on GPU it still has subtle difference. If True, 
+        even on GPU your result will repeat, but note that this may reduce
+        GPU computational efficiency."""
 
-        if type(batch_norm) is not bool:
-            raise TypeError(
-                "The `batch_norm` parameter is expected to be a bool type.")
+    if type(strict) is not bool:
+        raise TypeError("`strict` must be bool type.")
+    torch.manual_seed(seed)
+    if strict:
+        print("Warning: Set `strict=True` may reduce computational efficiency of your GPUs. "
+              "Be cautious to do this!")
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    return
 
-        if mode not in {'train', 'test'}:
-            raise ValueError(
-                "The `mode` parameter should be either 'train' or 'test'.")
 
+class Encoder(nn.Module):
+    """VAE 编码器。注意VAE的编码器不是直接进行“编码”的，而是构建了编码的均值和标准差。
+    """
+
+    def __init__(self, xmlFile):
         super().__init__()
-        self.n_latent = n_latent
-        self.lamb = lamb
-        self.lr = lr
-        self.use_bn = batch_norm
-        self.mode = True if mode == 'train' else False
-        self.test = not self.train  # maybe not be used
-        self.conv1 = self.conv3d(1, 16, 5, 2,
-                                 padding=2, bias=False)
-        self.conv2 = self.conv3d(16, 32, 5, 2,
-                                 padding=2, bias=False)
-        self.conv3 = self.conv3d(32, 64, 5, 2,
-                                 padding=2, bias=False)
-        self.conv4 = self.conv3d(64, 64, 5, 2,
-                                 padding=2, bias=False)
-        self.conv5 = self.conv3d(64, 128, 5, 4,
-                                 padding=1, bias=False)
-        self.fc1 = nn.Linear(128, self.n_latent, bias=True)
-        self.fc2 = nn.Linear(128, self.n_latent, bias=True)
-        self.fc3 = nn.Linear(self.n_latent, 128, bias=True)
-        self.conv_transpose1 = self.conv_transpose3d(128, 64, 5, 4,
-                                                     padding=1, output_padding=1, bias=False)
-        self.conv_transpose2 = self.conv_transpose3d(64, 64, 5, 2,
-                                                     padding=2, output_padding=1, bias=False)
-        self.conv_transpose3 = self.conv_transpose3d(64, 32, 5, 2,
-                                                     padding=2, output_padding=1, bias=False)
-        self.conv_transpose4 = self.conv_transpose3d(32, 16, 5, 2,
-                                                     padding=2, output_padding=1, bias=False)
-        self.conv_transpose5 = nn.Sequential(
-            nn.ConvTranspose3d(16, 1, 5, 2,
-                               padding=2, output_padding=1, bias=True, padding_mode='zeros'),
-            *(nn.BatchNorm3d(1, affine=self.mode),  # Pythonic! ( ͡° ͜ʖ ͡°)✧ HaHa.
-              nn.Sigmoid()) if self.use_bn else (nn.Sigmoid(),)
-        )
+        hp, nnParams = parseConfig(xmlFile)
+        self.nLatent = hp['nLatent']
+        for layerType, layerParam in nnParams.items():
+            if layerType.startswith("Encoder-"):
+                self.add_module('-'.join(layerType.split('-')[1:]),
+                                constructOneLayer(layerType, layerParam))
+                self._out_channels = layerParam['out_channels']
+        self.fc1 = nn.Linear(self._out_channels, self.nLatent, bias=True)
+        self.fc2 = nn.Linear(self._out_channels, self.nLatent, bias=True)
+
+    def forward(self, x):
+        for name, module in self.named_children():
+            if name.startswith("conv-"):
+                x = module(x)
+        x = x.squeeze()
+        mu = self.fc1(x)
+        logSigma = self.fc2(x)
+        return mu, logSigma
+
+
+class Decoder(nn.Module):
+    """VAE解码器。"""
+
+    def __init__(self, xmlFile):
+        super().__init__()
+        hp, nnParams = parseConfig(xmlFile)
+        self.nLatent = hp['nLatent']
+        self._out_features = nnParams['Decoder-convT-1']['in_channels']
+        self.fc = nn.Linear(self.nLatent, self._out_features)
+        for layerType, layerParam in nnParams.items():
+            if layerType.startswith("Decoder-"):
+                self.add_module('-'.join(layerType.split('-')[1:]),
+                                constructOneLayer(layerType, layerParam))
+
+    def forward(self, coding):
+        reconstruction = self.fc(coding)
+        reconstruction = reconstruction.view(*reconstruction.shape, 1, 1, 1)
+        for name, module in self.named_children():
+            if name.startswith("convT-"):
+                reconstruction = module(reconstruction)
+        return reconstruction
+
+
+class Vae(nn.Module):
+    def __init__(self, xmlFile):
+        super().__init__()
+        hp, _ = parseConfig(xmlFile)
+        self.lamb = hp['lambda']
+        self.encoder = Encoder(xmlFile)
+        self.decoder = Decoder(xmlFile)
 
     def forward(self, x):
         """神经网络的前向计算函数，定义整个模型的执行过程：从输入到输出。
 
             在VAE中前向计算经过三步：
-                1) 计算均值 mu 和标准差 log_sigma;
-                2) 重参数技巧获取隐变量 z;
-                3) 解码器生成重建颗粒 x_re."""
+                1) 计算均值 mu 和标准差 logSigma;
+                2) 再参数化获取隐变量 z;
+                3) 解码器生成重建颗粒 xRe."""
 
-        mu, log_sigma = self.encoder(x)
-        z = self.reparameterize(mu, log_sigma)
-        x_re = self.decoder(z)
-        return x_re, mu, log_sigma
+        mu, logSigma = self.encoder(x)
+        z = self.reparameterize(mu, logSigma)
+        xRe = self.decoder(z)
+        return xRe, mu, logSigma
 
-    def conv3d(self, in_channels, out_channels, kernel_size, stride=1, padding=0,
-               bias=True, dilation=1, groups=1, padding_mode='zeros'):
-        """Be sensitive to the various parameters in convolution layers!
-
-        Parameters:
-        -----------
-        dilation(int or tuple): In PyTorch, `dilation` actually means "dilation rate" 
-            depictedin various literatures, which means there are dilation-1 spaces 
-            inserted between kernel elements such that `dilation=1` corresponds to a 
-            regular convolution. That's why the default value of `dilation` is 1.
-        padding_mode(str, 'zeros'): 只能设为'zeros', 猜测这是为了后续丰富功能选项设置的向后
-            兼容的API接口。
-        groups: ？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？
-        """
-
-        if self.use_bn:
-            return nn.Sequential(
-                nn.Conv3d(in_channels, out_channels, kernel_size,
-                          stride=stride, padding=padding, bias=bias,
-                          dilation=dilation, groups=groups, padding_mode=padding_mode),
-                nn.BatchNorm3d(out_channels, affine=self.mode),
-                nn.ReLU()
-            )
-        else:
-            return nn.Sequential(
-                nn.Conv3d(in_channels, out_channels, kernel_size,
-                          stride=stride, padding=padding, bias=bias,
-                          dilation=dilation, groups=groups, padding_mode=padding_mode),
-                nn.ReLU()
-            )
-
-    def conv_transpose3d(self, in_channels, out_channels, kernel_size, stride=1, padding=0,
-                         output_padding=0, bias=True, groups=1, dilation=1, padding_mode='zeros'):
-        """Be sensitive to the various parameters in transposed convolution layers!
-
-        Parameters:
-        -----------
-        padding(int or tuple): In PyTorch, the `padding` argument effectively adds 
-            `dilation * (kernel_size - 1) - padding` amount of zero padding to both 
-            sizes of the input.
-        output_padding(int or tuple): Additional size added to ONE side of each dimension
-            in the output shape. Default: 0
-        dilation(int or tuple): In PyTorch, `dilation` actually means "dilation rate" 
-            depictedin various literatures, which means there are dilation-1 spaces 
-            inserted between kernel elements such that `dilation=1` corresponds to a 
-            regular convolution. That's why the default value of `dilation` is 1.
-        padding_mode(str, 'zeros'): 只能设为'zeros', 猜测这是为了后续丰富功能选项设置的向后
-            兼容的API接口。
-        groups: ？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？
-        """
-        if self.use_bn:
-            return nn.Sequential(
-                nn.ConvTranspose3d(in_channels, out_channels, kernel_size, stride=stride,
-                                   padding=padding, output_padding=output_padding, bias=bias,
-                                   groups=groups, dilation=dilation, padding_mode='zeros'),
-                nn.BatchNorm3d(out_channels, affine=self.mode),
-                nn.ReLU()
-            )
-        else:
-            return nn.Sequential(
-                nn.ConvTranspose3d(in_channels, out_channels, kernel_size, stride=stride,
-                                   padding=padding, output_padding=output_padding, bias=bias,
-                                   groups=groups, dilation=dilation, padding_mode='zeros'),
-                nn.ReLU()
-            )
-
-    def reparameterize(self, mu, log_sigma):
-        """重参数技巧，进行再参数化。
+    def reparameterize(self, mu, logSigma):
+        """再参数化技巧。
 
         Note:
         -----
-        log_sigma 原来用 long_val/2 表示，不过在这里和后续 loss 中的数学公式两者等价，
-            实际也没产生什么影响"""
-
-        sigma = torch.exp(log_sigma)
+        logSigma 原来用 logVal/2 表示，不过在这里和后续 loss 中的数学公式两者等价，实际不产生影响。
+        """
+        sigma = torch.exp(logSigma)
         epsilon = torch.randn_like(sigma)
-        coding = mu + sigma * epsilon   # 即隐变量z
+        coding = mu + sigma * epsilon  # 即隐变量z
         return coding
 
-    def encoder(self, source):
-        """VAE 编码器。
-
-            注意，这里没有编码成最终coding，而是构建了均值和标准差。"""
-
-        source = nn.Sequential(self.conv1,
-                               self.conv2,
-                               self.conv3,
-                               self.conv4,
-                               self.conv5)(source)
-        source = source.view(source.shape[0], -1)
-        mu = self.fc1(source)
-        log_sigma = self.fc2(source)
-        return mu, log_sigma
-
-    def decoder(self, coding):
-        """VAE 解码器。"""
-
-        # names=('nSamples', 'channels', 'D', 'H', 'W')
-        reconstruction = coding
-        reconstruction = self.fc3(reconstruction)
-        reconstruction = reconstruction.view(*reconstruction.shape, 1, 1, 1)
-        reconstruction = nn.Sequential(
-            self.conv_transpose1,
-            self.conv_transpose2,
-            self.conv_transpose3,
-            self.conv_transpose4,
-            self.conv_transpose5
-        )(reconstruction)
-        return reconstruction
-
-    def criterion(self, x_re, x, mu, log_sigma):
+    def criterion(self, xRe, x, mu, logSigma):
         """学习准则，即损失函数。"""
 
-        loss_re = F.binary_cross_entropy(x_re, x, reduction='none')
+        loss_re = F.binary_cross_entropy(xRe, x, reduction='none')
         loss_re = torch.sum(loss_re, axis=tuple(range(1, loss_re.ndim)))
         loss_re = torch.mean(loss_re)   # scalar
         # loss_kl如下公式通常写作负数形式，但经测试写成如下形式没问题
-        loss_kl = 0.5 * torch.sum(torch.pow(mu, 2) + torch.exp(log_sigma) - log_sigma - 1,
+        loss_kl = 0.5 * torch.sum(torch.pow(mu, 2) + torch.exp(logSigma) - logSigma - 1,
                                   axis=tuple(range(1, mu.ndim)))
         loss_kl = torch.mean(loss_kl)   # scalar
         loss = loss_re + self.lamb * loss_kl    # scalar
         return loss_re, loss_kl, loss
 
-    def optimizer(self):
-        """优化器，即采用的优化算法。"""
-
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
-
     def initialize(self):
         """参数初始化，即用特定的数值来初始化神经网络的各权重和偏置。"""
-
         for module in self.modules():
             if isinstance(module, (nn.Conv3d, nn.ConvTranspose3d, nn.Linear)):
                 nn.init.xavier_uniform_(module.weight)
@@ -229,58 +150,113 @@ class VAE(nn.Module):
         from particle.pipeline import Sand
         self.eval()
         with torch.no_grad():
-            x_re, *_ = self.forward(x)
-            raw_cube = Sand(x[0, 0].detach().numpy())
-            fake_cube = Sand(x_re[0, 0].detach().numpy())
-            fig1 = raw_cube.visualize(figure='Original Particle',
-                                      voxel=voxel, glyph=glyph)
-            fig2 = fake_cube.visualize(figure='Reconstructed Particle',
-                                       voxel=voxel, glyph=glyph, scale_mode='scalar')
+            xRe, *_ = self.forward(x)
+            rawCube = Sand(x[0, 0].detach().numpy())
+            fakeCube = Sand(xRe[0, 0].detach().numpy())
+            fig1 = rawCube.visualize(figure='Original Particle',
+                                     voxel=voxel, glyph=glyph)
+            fig2 = fakeCube.visualize(figure='Reconstructed Particle',
+                                      voxel=voxel, glyph=glyph, scale_mode='scalar')
         return fig1, fig2
 
-    def random_generate(self, coding=None, color=(0.65, 0.65, 0.65), opacity=1.0, voxel=False, glyph='sphere'):
-        """开启eval()模式，生成一个随机数编码，绘制 VAE 解码器解码生成的图像。若要继续训练模型，
-            记得在此函数调用后将模型设为train()模式。
+    def generate(self, coding=None):
+        """根据给定的编码向量生成颗粒。若不给定编码，随机生成一个颗粒。若要继续训练模型，
+        记得在此函数调用后将模型设为train()模式。
 
         Parameters:
         -----------
-        coding(2-d torch.Tensor, optional): The given coding. If not given 
-            explicitly, randomly sampled from the normal distribution.
-        voxel(bool, optional): Whether to draw a voxelization figure
-        glyph(str, optinoal): The glyph represents a single voxel, this argument
-            works only when `voxel=True`"""
+        coding(1-d torch.Tensor-vector or a batch of torch.Tensor-vectors, optional):
+            The given coding. If not given explicitly, randomly sampled from the normal distribution.
 
-        from particle.pipeline import Sand
+        return:
+        -------
+        cubes(np.array): (64, 64, 64) or (*, 64, 64 ,64)
+        """
+
         if coding is None:
             coding = torch.randn(1, self.n_latent)
+        decoder = self.decoder.cpu()
+        if coding.shape == (decoder.nLatent,):
+            coding.unsqueeze_(dim=0)
         self.eval()
         with torch.no_grad():
-            fake = self.decoder(coding)
-            fake = fake.detach().numpy()[0, 0]
-            fake = Sand(fake)
-            fig = fake.visualize(figure='Randomly Generated Particle', color=color, opacity=opacity,
-                                 voxel=voxel, glyph=glyph, scale_mode='scalar')
-        return fig
+            cubes = decoder(coding)
+            cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+        cubes = cubes.numpy()
+        return cubes
 
-    @staticmethod
-    def set_seed(seed, strict=False):
-        """Set the random number seed, so that the results may be reproduced
-            if you want.
 
-        Parameters:
-        -----------
-        seed(int): The desired seed.
-        strict(bool, optional): If False, you can reproduce your work on CPU
-            completely, but on GPU it still has subtle difference. If True, 
-            even on GPU your result will repeat, but note that this may reduce
-            GPU computational efficiency."""
+def train(sourcePath='data/liutao/v1/particles.npz',
+          xml="particle/nn/config/vae.xml",
+          device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+          img_dir="output/vae/process",
+          log_dir="output/vae",
+          ckpt_dir="output/vae"):
+    # build train set & test set
+    hp, _ = parseConfig(xml)
+    trainSet = loadNnData(sourcePath, 'trainSet')
+    trainSet = DataLoader(TensorDataset(trainSet),
+                          batch_size=hp['bs'], shuffle=True)
+    testSet = loadNnData(sourcePath, 'testSet')
+    testSet = DataLoader(TensorDataset(testSet),
+                         batch_size=hp['bs']*2, shuffle=False)
 
-        if type(strict) is not bool:
-            raise TypeError("`strict` must be bool type.")
-        torch.manual_seed(seed)
-        if strict:
-            print("Warning: Set `strict=True` may reduce computational efficiency of your GPUs. "
-                  "Be cautious to do this!")
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
-        return
+    # build and initilize VAE model
+    vae = Vae(xml).to(device)
+    vae.initialize()
+    optim = torch.optim.Adam(vae.parameters(), lr=hp['lr'])
+    lossFn = vae.criterion
+
+    # set output settings
+    logger = setLogger("vae", log_dir)
+    ckpt_dir = os.path.abspath(ckpt_dir)
+    img_dir = os.path.abspath(img_dir)
+    logger.critical(f"\n{hp}")
+    logger.critical(f"\n{vae}")
+
+    for epoch in range(hp['nEpoch']):
+        vae.train()
+        for i, (x,) in enumerate(trainSet):
+            x = x.to(dtype=torch.float, device=device)
+            xRe, mu, logSigma = vae(x)
+            loss_re, loss_kl, loss = lossFn(xRe, x, mu, logSigma)
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
+            if (i + 1) % 10 == 0 or (i + 1) == len(trainSet):
+                logger.info("[Epoch {}/{}] [Step {}/{}] [loss_re {:.4f}] [loss_kl {:.4f}] [loss {:.4f}]".
+                            format(epoch + 1, hp["nEpoch"], i + 1, len(trainSet), loss_re.item(), loss_kl.item(), loss.item()))
+        vae.eval()
+        logger.info("Model is running on the test set...")
+        lastTestLoss = 1  # 初始值只要比一开始的testLoss大即可
+        with torch.no_grad():
+            testLoss_re = testLoss_kl = testLoss = 0
+            for (x,) in testSet:
+                x = x.to(dtype=torch.float, device=device)
+                xRe, mu, logSigma = vae(x)
+                lossRes = lossFn(xRe, x, mu, logSigma)
+                testLoss_re += lossRes[0]
+                testLoss_kl += lossRes[1]
+                testLoss += lossRes[2]
+            testLoss_re /= len(testSet)
+            testLoss_kl /= len(testSet)
+            testLoss /= len(testSet)
+            logger.info("loss in test set: [testLoss_re {:.4f}] [testLoss_kl {:.4f}] [testLoss {:.4f}]".format(
+                testLoss_re, testLoss_kl, testLoss))
+        # 确认是否保存模型参数
+        if testLoss < lastTestLoss:
+            torch.save(vae.state_dict(), os.path.join(
+                ckpt_dir, 'state_dict.pt'))
+            logger.info(f"Model checkpoint has been stored in {ckpt_dir}.")
+            lastTestLoss = testLoss
+        else:
+            logger.warning("The model may be overfitting!")
+    logger.info("Train finished!")
+
+
+if __name__ == "__main__":
+    # vae = Vae("./particle/nn/config/vae.xml")
+    # print(vae)
+    # x = torch.rand(100, 1, 64, 64, 64)
+    # assert vae(x)[0].size() == x.size()
+    train()

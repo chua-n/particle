@@ -75,13 +75,13 @@ class parseHTMLLog:
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    log = "/home/chuan/soil/output/dcgan/dcgan.log"
-    var1 = parseLog(log, "loss_D")
-    var2 = parseLog(log, "loss_G")
+    log = "/home/chuan/soil/output/vae/vae.log"
+    var1 = parseLog(log, "loss_re")
+    var2 = parseLog(log, "testLoss_re")
     fig, ax = plt.subplots(2, 1, sharex=True, figsize=(16, 12))
     ax[0].plot(var1)
-    ax[0].set(ylabel="loss_D")
+    ax[0].set(ylabel="loss_re")
     ax[1].plot(var2)
-    ax[1].set(ylabel="loss_G")
+    ax[1].set(ylabel="testLoss_re")
     plt.xlabel('iter')
     plt.show()

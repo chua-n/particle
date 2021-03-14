@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nn xmlns="nn.chuan.nju"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="nn.chuan.nju ./nn.xsd">
+    <hp>
+        <nEpoch>200</nEpoch>
+        <bs>64</bs>
+        <lr>1e-3</lr>
+        <nLatent>32</nLatent>
+        <lambda>40</lambda>
+    </hp>
+    <nnLayer>
+        <!-- Encoder -->
+        <!-- 1 * 64 * 64 * 64 -->
+        <conv dim="3d" id="1" block="Encoder">
+            <in_channels>1</in_channels>
+            <out_channels>16</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </conv>
+
+        <!-- 16 * 32 * 32 * 32 -->
+        <conv dim="3d" id="2" block="Encoder">
+            <in_channels>16</in_channels>
+            <out_channels>32</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </conv>
+
+        <!-- 32 * 16 * 16 * 16 -->
+        <conv dim="3d" id="3" block="Encoder">
+            <in_channels>32</in_channels>
+            <out_channels>64</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </conv>
+
+        <!-- 64 * 8 * 8 * 8 -->
+        <conv dim="3d" id="4" block="Encoder">
+            <in_channels>64</in_channels>
+            <out_channels>64</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </conv>
+
+        <!-- 64 * 4 * 4 * 4 -->
+        <conv dim="3d" id="5" block="Encoder">
+            <in_channels>64</in_channels>
+            <out_channels>128</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>4</stride>
+            <padding>1</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </conv>
+
+        <!-- 128 * 1 * 1 * 1 -->
+        <!-- <fc dim="1d" id="1" block="Encoder">
+            <in_features>128</in_features>
+            <out_features>32</out_features>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </fc>
+        <fc dim="1d" id="2" block="Encoder">
+            <in_features>128</in_features>
+            <out_features>32</out_features>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </fc> -->
+
+        <!-- Decoder -->
+        <!-- nLatent * 1 * 1 * 1 -->
+        <!-- <fc dim="1d" id="1" block="Decoder">
+            <in_features>32</in_features>
+            <out_features>128</out_features>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </fc> -->
+
+        <!-- 128 * 1 * 1 * 1 -->
+        <convT dim="3d" id="1" block="Decoder">
+            <in_channels>128</in_channels>
+            <out_channels>64</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>4</stride>
+            <padding>1</padding>
+            <output_padding>1</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <!-- 64 * 4 * 4 * 4 -->
+        <convT dim="3d" id="2" block="Decoder">
+            <in_channels>64</in_channels>
+            <out_channels>64</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <output_padding>1</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <!-- 64 * 8 * 8 * 8 -->
+        <convT dim="3d" id="3" block="Decoder">
+            <in_channels>64</in_channels>
+            <out_channels>32</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <output_padding>1</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <!-- 32 * 16 * 16 * 16 -->
+        <convT dim="3d" id="4" block="Decoder">
+            <in_channels>32</in_channels>
+            <out_channels>16</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <output_padding>1</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </convT>
+
+        <!-- 16 * 32 * 32 * 32 -->
+        <convT dim="3d" id="5" block="Decoder">
+            <in_channels>16</in_channels>
+            <out_channels>1</out_channels>
+            <kernel_size>5</kernel_size>
+            <stride>2</stride>
+            <padding>2</padding>
+            <output_padding>1</output_padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>sigmoid</activate>
+        </convT>
+
+        <!-- 1 * 64 * 64 * 64 -->
+    </nnLayer>
+</nn>

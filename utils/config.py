@@ -1,6 +1,5 @@
 from xml.dom import minidom
 from torch import nn
-from torch.nn.modules import normalization
 
 
 def parseConfig(xmlFile):
@@ -8,8 +7,9 @@ def parseConfig(xmlFile):
 
     Returns:
     --------
-    nnParams(dict): note that, since Python 3.6, the default dict strcture
-        returned here is an ordered dict.
+    hp(dict): hyper parameters
+    nnParams(dict): neural network parameters
+        note that, since Python 3.6, the default dict strcture returned here is an ordered dict.
     """
 
     document = minidom.parse(xmlFile)

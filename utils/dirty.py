@@ -10,9 +10,12 @@ import torch
 
 def loadNnData(sourcePath, keyword: str = None) -> torch.Tensor:
     if sourcePath.endswith('.npy'):
-        return torch.from_numpy(np.load(sourcePath))
+        data = torch.from_numpy(np.load(sourcePath))
     elif sourcePath.endswith('.npz'):
-        return torch.from_numpy(np.load(sourcePath)[keyword])
+        data = torch.from_numpy(np.load(sourcePath)[keyword])
+    if data.max() == 255:
+        data[data == 255] = 1
+    return data
 
 
 def sample_labels(size: int, lim: list, seed: int = None) -> np.ndarray:
