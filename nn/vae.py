@@ -159,7 +159,7 @@ class Vae(nn.Module):
                                       voxel=voxel, glyph=glyph, scale_mode='scalar')
         return fig1, fig2
 
-    def generate(self, coding=None):
+    def generate(self, coding=None, thrd: float = 0.5):
         """根据给定的编码向量生成颗粒。若不给定编码，随机生成一个颗粒。若要继续训练模型，
         记得在此函数调用后将模型设为train()模式。
 
@@ -182,6 +182,10 @@ class Vae(nn.Module):
         with torch.no_grad():
             cubes = decoder(coding)
             cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+        if thrd is not None:
+            cubes[cubes <= thrd] = 0
+            cubes[cubes > thrd] = 1
+            cubes = cubes.type(torch.uint8)
         cubes = cubes.numpy()
         return cubes
 
@@ -259,4 +263,5 @@ if __name__ == "__main__":
     # print(vae)
     # x = torch.rand(100, 1, 64, 64, 64)
     # assert vae(x)[0].size() == x.size()
+    torch.manual_seed(3.14)
     train()

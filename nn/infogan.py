@@ -174,7 +174,7 @@ def get_fixed_z(nNoise, nDisc, nCont, device):
     # fixed_z2 = torch.cat((fixed_noise, fixed_disc, fixed_cont2), dim=1)
 
 
-def generate(net_G: Generator, vector):
+def generate(net_G: Generator, vector: torch.Tensor, thrd: float = 0.5):
     net_G = net_G.cpu()
     net_G.eval()
     if vector.shape == (net_G.nLatent,):
@@ -183,6 +183,10 @@ def generate(net_G: Generator, vector):
     with torch.no_grad():
         cubes = net_G(vector)
         cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+    if thrd is not None:
+        cubes[cubes <= thrd] = 0
+        cubes[cubes > thrd] = 1
+        cubes = cubes.type(torch.uint8)
     cubes = cubes.numpy()
     return cubes
 

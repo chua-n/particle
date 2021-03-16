@@ -64,7 +64,7 @@ class Generator(nn.Module):
         return
 
 
-def generate(net_G, vector):
+def generate(net_G: Generator, vector: torch.Tensor, thrd: float = 0.5):
     net_G = net_G.cpu()
     net_G.eval()
     if vector.shape == (net_G.nLatent,):
@@ -73,6 +73,10 @@ def generate(net_G, vector):
     with torch.no_grad():
         cubes = net_G(vector)
         cubes = cubes[0, 0] if cubes.size(0) == 1 else cubes[:, 0]
+    if thrd is not None:
+        cubes[cubes <= thrd] = 0
+        cubes[cubes > thrd] = 1
+        cubes = cubes.type(torch.uint8)
     cubes = cubes.numpy()
     return cubes
 
@@ -187,4 +191,5 @@ def train(source_path='data/liutao/v1/particles.npz',
 
 
 if __name__ == "__main__":
+    torch.manual_seed(3.14)
     train()
