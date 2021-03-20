@@ -193,7 +193,6 @@ class Vae(nn.Module):
 def train(sourcePath='data/liutao/v1/particles.npz',
           xml="particle/nn/config/vae.xml",
           device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-          img_dir="output/vae/process",
           log_dir="output/vae",
           ckpt_dir="output/vae"):
     # build train set & test set
@@ -214,7 +213,6 @@ def train(sourcePath='data/liutao/v1/particles.npz',
     # set output settings
     logger = setLogger("vae", log_dir)
     ckpt_dir = os.path.abspath(ckpt_dir)
-    img_dir = os.path.abspath(img_dir)
     logger.critical(f"\n{hp}")
     logger.critical(f"\n{vae}")
 
