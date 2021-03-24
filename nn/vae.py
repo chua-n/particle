@@ -53,7 +53,8 @@ class Encoder(nn.Module):
         for name, module in self.named_children():
             if name.startswith("conv-"):
                 x = module(x)
-        x = x.squeeze()
+        # x = x.view(x.size(0), -1)
+        x = x.view(*x.shape[:2])
         mu = self.fc1(x)
         logSigma = self.fc2(x)
         return mu, logSigma
@@ -252,6 +253,8 @@ def train(sourcePath='data/liutao/v1/particles.npz',
             logger.info(f"Model checkpoint has been stored in {ckpt_dir}.")
             lastTestLoss = testLoss
         else:
+            torch.save(vae.state_dict(), os.path.join(
+                ckpt_dir, 'state_dict-overfit.pt'))
             logger.warning("The model may be overfitting!")
     logger.info("Train finished!")
 
