@@ -4,6 +4,7 @@ from functools import wraps
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
+from scipy.spatial.distance import jensenshannon
 
 import torch
 
@@ -302,6 +303,16 @@ def timer(func):
             f"Function `{func.__name__}` runs for {hour}h {minute}min {second}s")
         return res
     return wrapper
+
+
+class Entropy:
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
+    def JSDivergence(p, q, tolerance=0.98, base=2):
+        assert tolerance < np.sum(p) <= 1 and tolerance < np.sum(q) <= 1
+        return jensenshannon(p, q, base=base)
 
 
 if __name__ == '__main__':
