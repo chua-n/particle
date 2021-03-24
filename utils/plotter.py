@@ -1,7 +1,8 @@
 import random
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import numpy as np
+import pandas as pd
 from skimage.measure import marching_cubes
 import torch
 
@@ -117,7 +118,7 @@ def cuboid(cuboidVerticesX, cuboidVerticesY, cuboidVerticesZ, color=(1, 1, 0.5),
 
     Parameters:
     -----------
-    cuboidVerticesX/Y/Z (np.ndarray, shape (2, 2, 2)): coordinates of the 8 vertices 
+    cuboidVerticesX/Y/Z (np.ndarray, shape (2, 2, 2)): coordinates of the 8 vertices
         of a cuboid along X/Y/Z axis.
     """
     from mayavi import mlab
@@ -175,3 +176,87 @@ class DisplayCube:
         mlab.triangular_mesh(verts[:, 0], verts[:, 1], verts[:, 2], faces)
         mlab.show()
         return
+
+
+class Violin:
+    """Bad code..."""
+    NpzFile = np.lib.npyio.NpzFile
+
+    def __init__(self, dataSet: Union[NpzFile, Tuple[NpzFile]], name: Union[str, Tuple[str]]) -> None:
+        dataSet = list(dataSet)
+        name = list(name)
+        for i in range(len(dataSet)):
+            dataSet[i] = dict(dataSet[i].items())
+            dataSet[i].pop('mask')
+            dataSet[i] = pd.DataFrame(dataSet[i])
+            dataSet[i].index = pd.MultiIndex.from_tuples(
+                [(name[i], idx) for idx in dataSet[i].index])
+        self.dataSet = pd.concat(dataSet, axis=0)
+        self.name = name
+
+    def plot(self, *, feature, setName, figsize=None, **kwargs):
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+
+        # font = {'font': "Monospace", 'fontsize': 18}
+        axNum = len(setName)
+        if axNum == 1:
+            data = self.dataSet.loc[setName, feature]
+            fig, ax = plt.subplots(figsize=figsize)
+            sns.violinplot(data=data, ax=ax, **kwargs)
+        elif axNum == 2:
+            setName = list(setName)
+            fig, ax = plt.subplots(figsize=figsize)
+            data = self.dataSet.loc[setName, feature]
+            js = self.jsHelper(data[setName[0]], data[setName[1]])
+            data = pd.DataFrame(data)
+            data['dataSet'] = None
+            for name in setName:
+                data.loc[name, 'dataSet'] = name
+            sns.violinplot(data=data, x=[0]*len(data), y=feature, hue='dataSet',
+                           split=True, ax=ax, **kwargs)
+            ax.set_title(f"JS-Divergence: {js}")
+        elif axNum == 3:
+            setName = list(setName)
+            fig, ax = plt.subplots(1, 2, sharey=True, figsize=figsize)
+            data = self.dataSet.loc[setName, feature]
+            data = pd.DataFrame(data)
+            data['dataSet'] = None
+            for name in setName:
+                data.loc[name, 'dataSet'] = name
+            vaeData = data.loc[['real', 'vae']]
+            ganData = data.loc[['real', 'gan']]
+            sns.violinplot(data=vaeData, x=[0]*len(vaeData), y=feature, hue='dataSet',
+                           split=True, ax=ax[0], **kwargs)
+            sns.violinplot(data=ganData, x=[0]*len(ganData), y=feature, hue='dataSet',
+                           split=True, ax=ax[1], **kwargs)
+            jsVae = self.jsHelper(
+                vaeData.loc['real', feature].values, vaeData.loc['vae', feature].values)
+            jsGan = self.jsHelper(
+                ganData.loc['real', feature].values, ganData.loc['gan', feature].values)
+            ax[0].set_title(f"JS-Divergence: {jsVae}")
+            ax[1].set_title(f"JS-Divergence: {jsGan}")
+            # ax[1].set_ylabel(None)
+        else:
+            raise ValueError("Check the parameter `setName`!")
+        return fig
+
+    def jsHelper(self, vec1, vec2, nPoint=1001):
+        """帮助计算同一个特征的两个分布之间的js散度。"""
+        from scipy.stats import gaussian_kde
+        from particle.utils.dirty import Entropy
+        # 两个向量的极值
+        extrema = np.array([np.sort(vec1)[[0, -1]],
+                            np.sort(vec2)[[0, -1]]])
+        # 设定特征（x）的变化范围
+        xRange = np.linspace(extrema.min(), extrema.max(), nPoint)
+        unitIntervalLength = (xRange[-1] - xRange[0]) / (nPoint - 1)
+        # 计算概率密度density
+        dsty1 = gaussian_kde(vec1).pdf(xRange)
+        dsty2 = gaussian_kde(vec2).pdf(xRange)
+        # 计算概率
+        p1 = dsty1 * unitIntervalLength
+        p2 = dsty2 * unitIntervalLength
+        # 计算JS散度
+        js = Entropy.JSDivergence(p1, p2)
+        return round(js, 2)
