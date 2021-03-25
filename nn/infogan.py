@@ -307,7 +307,7 @@ def train(source_path='data/liutao/v1/particles.npz',
                         cube = cube[0]  # discard the channel axis
                         sand = Sand(cube)
                         sand.visualize(voxel=True, glyph='point')
-                        # sand.visualize(realistic=False)
+                        # sand.visualize(vivid=False)
                         mlab.outline()
                         img = mlab.screenshot()
                         mlab.close()

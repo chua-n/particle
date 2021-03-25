@@ -90,7 +90,7 @@ class Plotter:
     @classmethod
     def plotIntegration(cls, sandCube, tetrahedron):
         sand = Sand(sandCube)
-        scene = sand.visualize(realistic=False, opacity=0.6)
+        scene = sand.visualize(vivid=False, opacity=0.6)
         Plotter.plotTetrahedron(tetrahedron)
         center, radius = circumscribedSphere(tetrahedron)
         Plotter.plotSphere(center, radius, opacity=0.6)
@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     def plotResult():
         # mlab.figure(bgcolor=(1, 1, 1))
-        Sand(sandCube).visualize(realistic=False)
+        Sand(sandCube).visualize(vivid=False)
         remainedCenters, remainedRadii = filtSphere(mesh, 0.4, 120)
         for center, r in zip(remainedCenters, remainedRadii):
             Plotter.plotSphere(center, r)

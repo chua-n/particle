@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # data = np.load("./data/special/48.npy")
     # data = skimage.transform.rescale(data, 2)
     # data = data.reshape(1, 1, *data.shape)
-    data = np.load("./data/test_set.npy")
+    data = np.load("data/liutao/v1/particles.npz")["test"]
     print(data.shape)
     for i in range(len(data)):
         cube = data[i, 0]
@@ -47,6 +47,6 @@ if __name__ == "__main__":
         mlab.title(f"Total {len(r)} spheres.")
 
         sand = Sand(cube)
-        sand.visualize(realistic=False)
+        sand.visualize(vivid=False)
 
         mlab.show()

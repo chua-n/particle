@@ -105,41 +105,44 @@ class Sand:
                                                               method='lewiner')
         return self._verts, self._faces
 
-    def visualize(self, cube: np.ndarray = None, figure=None,
-                  color=(0.65, 0.65, 0.65), opacity=1.0,
-                  voxel: bool = False, glyph='cube', scale_mode='none',  # 体素形式的参数
-                  realistic: bool = True, sigma=0.8, filter_mode='reflect',  # 三角网格形式的参数
-                  fgcolor=(0, 0, 0), bgcolor=(1, 1, 1)):
-        """
-            可视化颗粒的表面，可选择画实心的体素形式，或提取的三角网格的表面形式，后者可选择是否
+    def visualize(self, cube=None, figure=None, fgcolor=(0, 0, 0), bgcolor=(1, 1, 1),
+                  vivid=True, voxel=False, **kwargs):
+        """可视化颗粒的表面，可选择画实心的体素形式，或提取的三角网格的表面形式，后者可选择是否
         进行高斯模糊以逼真化展示。
         """
         from mayavi import mlab
+        # foreground, background
+        kwargs['figure'] = mlab.figure(figure=figure,
+                                       fgcolor=fgcolor, bgcolor=bgcolor)
         if cube is None:
             cube = self.cube
-        cube = cube.astype(np.float)
-        # foreground, background
-        fig = mlab.figure(figure=figure, fgcolor=fgcolor, bgcolor=bgcolor)
+        cube = cube.astype(np.float32)
+        # 画体素时是否进行高斯模糊没有区别，因此体素图强制不进行高斯模糊
+        if vivid and not voxel:
+            cube = filters.gaussian(cube, sigma=0.8, mode='reflect')
 
-        if voxel:  # 如果要画体素形式
-            flatten = cube.reshape(-1)
-            x, y, z = np.nonzero(cube)
-            val = flatten[np.nonzero(flatten)]
-            mlab.points3d(x, y, z, val, color=color, opacity=opacity,
-                          mode=glyph, figure=fig, scale_mode=scale_mode)
-            return fig
+        if voxel:
+            return self._visualizeVoxel(cube, **kwargs)
+        else:
+            return self._visualizeTriMesh(cube, **kwargs)
 
-        if not realistic:  # 如果不要求逼真，即画原形状
-            verts, faces = self.surface()
-        else:  # 画高斯模糊后的形状
-            vivid = filters.gaussian(cube, sigma, mode=filter_mode)
-            verts, faces = self.surface(vivid)
-        mlab.triangular_mesh(verts[:, 0],
-                             verts[:, 1],
-                             verts[:, 2],
-                             faces, color=color, opacity=opacity, figure=fig)
-        # mlab.axes(xlabel='x',ylabel='y',zlabel='z')
+    def _visualizeVoxel(self, cube, color=(0.65, 0.65, 0.65), opacity=1.0, glyph="cube", scale_mode="none", figure=None):
+        from mayavi import mlab
+        flatten = cube.reshape(-1)
+        x, y, z = np.nonzero(cube)
+        val = flatten[np.nonzero(flatten)]
+        fig = mlab.points3d(x, y, z, val, color=color, opacity=opacity,
+                            mode=glyph, figure=figure, scale_mode=scale_mode)
         return fig
+
+    def _visualizeTriMesh(self, cube, color=(0.65, 0.65, 0.65), opacity=1.0, figure=None):
+        from mayavi import mlab
+        verts, faces = self.surface(cube)
+        figure = mlab.triangular_mesh(verts[:, 0],
+                                      verts[:, 1],
+                                      verts[:, 2],
+                                      faces, color=color, opacity=opacity, figure=figure)
+        return figure
 
     @staticmethod
     def savefig(fig_handle, filename, path=None, magnification='auto'):
