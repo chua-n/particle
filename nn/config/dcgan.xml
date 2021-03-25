@@ -5,7 +5,7 @@
         <nEpoch>30</nEpoch>
         <bs>64</bs>
         <lr>0.0002</lr>
-        <nLatent>32</nLatent>
+        <nLatent>64</nLatent>
         <iterD>1</iterD>
         <iterG>2</iterG>
     </hp>
@@ -79,7 +79,7 @@
         <!-- Generator -->
         <!-- nLatent * 1 * 1 * 1 -->
         <convT dim="3d" id="1">
-            <in_channels>32</in_channels>
+            <in_channels>64</in_channels>
             <out_channels>128</out_channels>
             <kernel_size>4</kernel_size>
             <stride>1</stride>
