@@ -3,34 +3,32 @@ import matplotlib.pyplot as plt
 from scipy import ndimage
 from skimage import io, draw
 
-img = io.imread("./testMGH2D/polygon.png")
+img = io.imread("/home/chuan/soil/particle/clump/testMGH2D/ellipse.png")
 # io.imshow(img)
 # io.show()
 
-img_bf = ndimage.distance_transform_bf(img)
-# io.imshow(img_bf, cmap="gray")
-# io.show()
+dist_img = ndimage.distance_transform_edt(img)
+io.imshow(dist_img, cmap="gray")
+io.show()
+dist_img_ = dist_img.copy()
 
-_img = img_bf.copy()
 center, radii = [], []
-while _img.max() > 0:
-    row, col = np.unravel_index(np.argmax(_img, axis=None), img_bf.shape)
+while dist_img.max() > 0:
+    row, col = np.unravel_index(np.argmax(dist_img, axis=None),
+                                dist_img.shape)
     center.append([row, col])
-    radius = _img[row, col]
+    radius = dist_img[row, col]
     radii.append(radius)
     rr, cc = draw.circle(row, col, round(radius))
-    draw.set_color(_img, [rr, cc], 0)
-    io.imshow(_img, cmap="gray")
+    draw.set_color(dist_img, [rr, cc], 0)
+    io.imshow(dist_img, cmap="gray")
     io.show()
 
-np.random.seed(314)
 center = np.array(center)
 radii = np.array(radii)
-fig, ax = plt.subplots()
-ax.plot(*np.nonzero(img_bf.T), 'o')
-tmp = center[:, 0].copy()
-center[:, 0] = center[:, 1]
-center[:, 1] = tmp
+center = center[:, [1, 0]]
+ax = plt.axes()
+ax.plot(*np.nonzero(dist_img_.T), 'o', markersize=1)
 for c, r in zip(center, radii):
     ax.add_artist(plt.Circle(c, r, fill=False))
 ax.set(xlim=((center[:, 0]-radii).min(), (center[:, 0]+radii).max()),
