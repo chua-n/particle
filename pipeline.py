@@ -126,22 +126,22 @@ class Sand:
         else:
             return self._visualizeTriMesh(cube, **kwargs)
 
-    def _visualizeVoxel(self, cube, color=(0.65, 0.65, 0.65), opacity=1.0, glyph="cube", scale_mode="none", figure=None):
+    def _visualizeVoxel(self, cube, color=(0.65, 0.65, 0.65), glyph="cube", scale_mode="none", figure=None, **kwargs):
         from mayavi import mlab
         flatten = cube.reshape(-1)
         x, y, z = np.nonzero(cube)
         val = flatten[np.nonzero(flatten)]
-        fig = mlab.points3d(x, y, z, val, color=color, opacity=opacity,
-                            mode=glyph, figure=figure, scale_mode=scale_mode)
+        fig = mlab.points3d(x, y, z, val, color=color, mode=glyph,
+                            figure=figure, scale_mode=scale_mode, **kwargs)
         return fig
 
-    def _visualizeTriMesh(self, cube, color=(0.65, 0.65, 0.65), opacity=1.0, figure=None):
+    def _visualizeTriMesh(self, cube, color=(0.65, 0.65, 0.65), figure=None, **kwargs):
         from mayavi import mlab
         verts, faces = self.surface(cube)
         figure = mlab.triangular_mesh(verts[:, 0],
                                       verts[:, 1],
                                       verts[:, 2],
-                                      faces, color=color, opacity=opacity, figure=figure)
+                                      faces, color=color, figure=figure, **kwargs)
         return figure
 
     @staticmethod
@@ -428,7 +428,7 @@ class SandHeap:
         circleMask = np.expand_dims(circleMask, 0).repeat(pln, axis=0)
         self.circleMask = circleMask
 
-    def drawHistogram(self, nbins=255):
+    def drawHistogram(self, nbins=256):
         print("Now plotting the histogram...")
         n, bins, patches = plt.hist(self.data[self.circleMask], bins=nbins)
         print("Plotting Complete!")
@@ -436,7 +436,7 @@ class SandHeap:
 
     @timer
     @checkStatus("data-loaded")
-    def equalizeHist(self, nbins=255, draw=False):
+    def equalizeHist(self, nbins=256, draw=False):
         res = exposure.equalize_hist(
             self.data, nbins=nbins, mask=self.circleMask)
         self.data = img_as_ubyte(res)
