@@ -126,7 +126,7 @@ def train(sourcePath="data/liutao/v1/particles.npz",
     # build train set & test set
     hp, _ = parseConfig(xml)
     trainSet = loadNnData(sourcePath, 'trainSet')
-    trainSet = DataLoader(TVSDataset(trainSet, transform=transforms.RandomRotation(180)),
+    trainSet = DataLoader(TVSDataset(trainSet, transform=transforms.RandomRotation(hp["rotation"])),
                           batch_size=hp['bs'], shuffle=True, drop_last=True)
     testSet = loadNnData(sourcePath, "testSet")
     testSet = DataLoader(TVSDataset(testSet),

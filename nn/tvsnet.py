@@ -29,16 +29,20 @@ class Encoder(nn.Module):
                 self.add_module('-'.join(layerType.split('-')[1:]),
                                 constructOneLayer(layerType, layerParam))
                 self._out_channels = layerParam['out_channels']
-        self.fc1 = nn.Linear(self._out_channels, self.nLatent, bias=True)
-        self.fc2 = nn.Linear(self._out_channels, self.nLatent, bias=True)
+        self.pool = nn.MaxPool2d(2)
+        self.dropout = nn.Dropout2d(p=0.2)  # 考虑加dropout到底合不合适
+        self.fc = nn.Linear(self._out_channels, 2*self.nLatent, bias=True)
 
     def forward(self, x):
         for name, module in self.named_children():
             if name.startswith("conv-"):
                 x = module(x)
+        x = self.pool(x)
+        x = self.dropout(x)
         x = x.view(*x.shape[:2])
-        mu = self.fc1(x)
-        logSigma = self.fc2(x)
+        x = self.fc(x)
+        midInd = x.size(1)//2
+        mu, logSigma = x[:, :midInd], x[:, midInd:]
         return mu, logSigma
 
 
@@ -87,7 +91,7 @@ class TVSNet(nn.Module):
         return coding
 
     def lossFn(self, x, xRe, mu, logSigma):
-        lossRe = self._bceLossFn(xRe, x) / x.size(0)
+        lossRe = self._bceLossFn(xRe, x).div_(x.size(0))
         lossKL = 0.5 * torch.sum(torch.pow(mu, 2) + torch.exp(logSigma) - logSigma - 1,
                                  axis=tuple(range(1, mu.ndim)))
         lossKL = torch.mean(lossKL)
@@ -121,6 +125,8 @@ class TVSNet(nn.Module):
             yRe, *_ = self.forward(x)
             rawCube = Sand(y[0, 0].detach().numpy())
             fakeCube = Sand(yRe[0, 0].detach().numpy())
+            fakeCube.cube[fakeCube.cube <= 0.5] = 0
+            fakeCube.cube[fakeCube.cube > 0.5] = 1
             fig1 = rawCube.visualize(figure='Original Particle', **kwargs)
             fig2 = fakeCube.visualize(
                 figure='Reconstructed Particle', **kwargs)
@@ -166,14 +172,14 @@ class TVSDataset(Dataset):
 
 
 def train(sourcePath="data/liutao/v1/particles.npz",
-          xml="particle/nn/config/mvsnet.xml",
+          xml="particle/nn/config/tvsnet.xml",
           device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-          logDir="output/mvsnet",
-          ckptDir="output/mvsnet"):
+          logDir="output/tvsnet",
+          ckptDir="output/tvsnet"):
     # build train set & test set
     hp, _ = parseConfig(xml)
     trainSet = loadNnData(sourcePath, 'trainSet')
-    trainSet = DataLoader(TVSDataset(trainSet, transform=transforms.RandomRotation(180)),
+    trainSet = DataLoader(TVSDataset(trainSet, transform=transforms.RandomRotation(hp["rotation"])),
                           batch_size=hp['bs'], shuffle=True, drop_last=True)
     testSet = loadNnData(sourcePath, "testSet")
     testSet = DataLoader(TVSDataset(testSet),

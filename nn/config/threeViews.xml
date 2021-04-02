@@ -5,6 +5,7 @@
         <nEpoch>100</nEpoch>
         <bs>128</bs>
         <lr>0.001</lr>
+        <rotation>180</rotation>
     </hp>
     <nnLayer>
         <!-- 64 * 64 -->

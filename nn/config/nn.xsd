@@ -60,6 +60,8 @@
                 <xs:element name="lambda" type="xs:float"/>
             </xs:choice>
 
+            <!-- for data enhancement -->
+            <xs:element name="rotation" type="xs:unsignedInt" minOccurs="0"/>
             <!-- <xs:any minOccurs="0"/> -->
 
         </xs:sequence>
