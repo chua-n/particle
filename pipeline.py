@@ -319,9 +319,6 @@ class Sand:
         surf_c = convex_hull.area
         return surf_p/surf_c
 
-    def cal_geo_feat_cube(self) -> list:  # dict更好
-        pass
-
 
 class SandHeap:
     """对整个沙土体的处理流程——从CT扫描图到单颗粒提取。
