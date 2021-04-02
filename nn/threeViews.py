@@ -1,7 +1,8 @@
 import os
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
 from particle.utils.log import setLogger
 from particle.utils.config import parseConfig, constructOneLayer
@@ -96,6 +97,27 @@ def getProjections(sourceSet: torch.Tensor):
     return projections
 
 
+class TVSDataset(Dataset):
+    def __init__(self, dataset, transform=None) -> None:
+        super().__init__()
+        self.dataset = dataset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        cubeImage = self.dataset[idx]
+        if self.transform is not None:
+            cubeImage = self.transform(cubeImage)
+        cube = cubeImage[0]
+        projection = torch.empty(3, cube.size(-1), cube.size(-1),
+                                 dtype=cube.dtype, device=cube.device)
+        for i in range(3):
+            projection[i] = project(cube, i)
+        return projection, cubeImage
+
+
 def train(sourcePath="data/liutao/v1/particles.npz",
           xml="particle/nn/config/threeViews.xml",
           device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -104,10 +126,10 @@ def train(sourcePath="data/liutao/v1/particles.npz",
     # build train set & test set
     hp, _ = parseConfig(xml)
     trainSet = loadNnData(sourcePath, 'trainSet')
-    trainSet = DataLoader(TensorDataset(trainSet),
-                          batch_size=hp['bs'], shuffle=True)
+    trainSet = DataLoader(TVSDataset(trainSet, transform=transforms.RandomRotation(180)),
+                          batch_size=hp['bs'], shuffle=True, drop_last=True)
     testSet = loadNnData(sourcePath, "testSet")
-    testSet = DataLoader(TensorDataset(testSet),
+    testSet = DataLoader(TVSDataset(testSet),
                          batch_size=hp['bs']*2, shuffle=False)
 
     # build and initilize TVSNet model
@@ -125,8 +147,7 @@ def train(sourcePath="data/liutao/v1/particles.npz",
     lastTestLoss = float("inf")
     for epoch in range(model.hp["nEpoch"]):
         model.train()
-        for i, (y,) in enumerate(trainSet):
-            x = getProjections(y)
+        for i, (x, y) in enumerate(trainSet):
             x = x.to(dtype=torch.float32, device=device)
             y = y.to(dtype=torch.float32, device=device)
             yRe = model(x)
@@ -145,8 +166,8 @@ def train(sourcePath="data/liutao/v1/particles.npz",
             # 为啥autopep8非要把我的lambda表达式给换成def函数形式......
             def transfer(x): return x.to(dtype=torch.float32, device=device)
             # sum函数将其内部视为生成器表达式？？？
-            testLoss = sum(
-                lossFn(model(transfer(getProjections(y))), transfer(y)) for (y,) in testSet)
+            testLoss = sum(lossFn(model(transfer(x)), transfer(y))
+                           for (x, y) in testSet)
             testLoss /= len(testSet)  # 这里取平均数
         logger.info(f"loss in test set: [testLoss {testLoss:.4f}]")
         # 确认是否保存模型参数
@@ -156,6 +177,8 @@ def train(sourcePath="data/liutao/v1/particles.npz",
             logger.info(f"Model checkpoint has been stored in {ckptDir}.")
             lastTestLoss = testLoss
         else:
+            torch.save(model.state_dict(), os.path.join(
+                ckptDir, 'state_dict-overfit.pt'))
             logger.warning("The model may be overfitting!")
     logger.info("Train finished!")
 
