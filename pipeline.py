@@ -215,17 +215,6 @@ class Sand:
         rescaled = np.where(rescaled >= 0.5, 1, 0).astype(np.uint8)
         return rescaled
 
-    def get_zernike_moments(self, order=6, scale_input=True, decimate_fraction=0,
-                            decimate_smooth=25, verbose=False):
-        """计算沙土颗粒的Zernike矩, moment是矩的意思。调得人家的包，没什么好说的。"""
-        from particle.mindboggle.shapes.zernike.zernike import zernike_moments
-        if self._verts is None or self._faces is None:
-            self.surface(self.cube)
-        descriptors = zernike_moments(self._verts, self._faces, order, scale_input,
-                                      decimate_fraction, decimate_smooth,
-                                      verbose)
-        return descriptors
-
     # ----------------------------以下为计算颗粒的几何特征参数--------------------------
 
     def sand_convex_hull(self, level: float = None) -> ConvexHull:
