@@ -33,6 +33,7 @@ def parseLog(logFile, key_word):
                 continue
             indBegin += len(key_word)
             indEnd = line.find(']', indBegin)
+            # 为GAN的解析保留一种特殊情况，无奈 ╮(╯▽╰)╭
             if key_word == 'D(G(z))':
                 values.append(float(line[indBegin:indEnd].split('/')[-1]))
             else:
@@ -85,27 +86,27 @@ if __name__ == "__main__":
     import numpy as np
     plt.style.use("bmh")
 
-    log = "/home/chuan/soil/output/vae/lamb=10/vae.log"
-    # var1 = parseLog(log, "loss")[:-27]
-    var1 = parseLog(log, "loss")
+    log = "/home/chuan/soil/output/tvsnet/TVSNet.log"
+    var1 = parseLog(log, "lossRe")
     var2 = parseLog(log, "testLoss")
     var1 = np.array(var1)
     var2 = np.array(var2)
-    # var1[42::43] = None
-    var1[21::22] = None
-    xRange1 = np.arange(len(var1))
-    # xRange2 = np.arange(42, len(var1), 43)
-    xRange2 = np.arange(21, len(var1), 22)
 
-    slicer1 = slice(len(xRange1)//4, None, None)
-    slicer2 = slice(len(xRange2)//4, None, None)
+    # 按真实的迭代顺序对齐横坐标
+    xRange1 = np.arange(len(var1))
+    xRange2 = np.arange(21, len(var1), 22)  # bs=128
+    # xRange2 = np.arange(42, len(var1), 43)  # bs=64
+
     # slicer1 = slice(None, None, None)
     # slicer2 = slice(None, None, None)
+    slicer1 = slice(len(xRange1)//4, None, None)
+    slicer2 = slice(len(xRange2)//4, None, None)
+
     fig, ax = plt.subplots(figsize=(12, 9))
     ax.plot(xRange1[slicer1], var1[slicer1], label="train set")
     ax.plot(xRange2[slicer2], var2[slicer2], label="test set")
     ax.spines["top"].set_visible(True)
     ax.set_xlabel('iter')
     ax.set_ylabel('loss')
-    # plt.legend()
-    plt.savefig("/home/chuan/vaeLoss.png", dpi=150)
+    plt.legend()
+    plt.savefig("/home/chuan/TVSNetLoss.png", dpi=150)
