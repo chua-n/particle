@@ -35,7 +35,7 @@
 
             <xs:choice minOccurs="0">
                 <!-- for general GAN or VAE -->
-                <xs:element name="nLatent" type="xs:unsignedByte"/>
+                <xs:element name="nLatent" type="xs:unsignedInt"/>
                 <!-- for infoGAN -->
                 <xs:sequence>
                     <xs:element name="nNoise" type="xs:unsignedInt"/>
