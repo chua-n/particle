@@ -19,16 +19,6 @@ def loadNnData(sourcePath, keyword: str = None) -> torch.Tensor:
     return data
 
 
-def sample_labels(size: int, lim: list, seed: int = None) -> np.ndarray:
-    """What's meaning of sample_labels?"""
-    if seed:
-        np.random.seed(seed)
-    all_sands = np.arange(*lim)  # lim是只含有两个int的列表[lo, hi]
-    # 不放回简单随机抽样
-    sampled_sands = np.sort(np.random.choice(all_sands, size, replace=False))
-    return sampled_sands
-
-
 def project(tensor: torch.tensor, dim: int):
     return torch.max(tensor, dim=dim).values
 

@@ -10,7 +10,7 @@ from particle.pipeline import Sand
 
 def getDelaunayTetrahedralMesh(sandCube):
     sand = Sand(sandCube)
-    convexHull = sand.sand_convex_hull()
+    convexHull = sand.sandConvexHull()
     # pointCloud = sand.point_cloud().T
     # pointCloud, _ = sand.surface()
     pointCloud = convexHull.points

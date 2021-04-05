@@ -1,8 +1,9 @@
 import os
+from typing import Tuple, Union
 import numpy as np
 
 import scipy.ndimage as ndi
-from skimage import filters, exposure, measure, morphology
+from skimage import filters, exposure, measure, morphology, transform
 from skimage.feature import peak_local_max
 from skimage.segmentation import watershed
 
@@ -10,7 +11,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
 from skimage.util import img_as_ubyte
 
-from .utils.dirty import sample_labels, Circumsphere, timer
+from .utils.dirty import timer, Circumsphere
 
 
 class Sand:
@@ -22,7 +23,7 @@ class Sand:
         level的含义用于self.surface()函数
         Attributes:
         -----------
-        cube: 64 × 64 × 64, np.uint8类型, 最大值为1而非255
+        cube: 64 × 64 × 64, np.uint8类型, 为“二值数组”，即其数值仅含0和255。
         verts: nPoints × 3"""
 
         self.cube = cube
@@ -59,17 +60,20 @@ class Sand:
         else:
             return border
 
-    def point_cloud(self) -> np.ndarray:
-        """转化为点云，尚不知有何用
+    def toCoords(self) -> np.ndarray:
+        """将颗粒体素转化为在存储数组中的坐标的形式。
+
         Returns
         -------
-            out: (3, nPoints) ndarray
-                Here 0 <= nPoints <= 64*64*64."""
+        out: (nPoints, 3) ndarray
+            Here 0 <= nPoints <= 64*64*64.
+        """
+        coords = np.nonzero(self.cube)
+        coords = np.asarray(coords, dtype=np.int16)
+        coords = coords.T
+        return coords
 
-        cloud = np.asarray(np.where(self.cube != 0), dtype=np.int32)
-        return cloud
-
-    def surface(self, cube: np.ndarray = None, level: float = None):
+    def findSurface(self, cube: np.ndarray = None, level: float = None):
         """原来的cube是三维数组表征的体素数据，此函数采用Lewiner-MC算法从cube中提取出沙粒表面。这个
         表面以一系列顶点verts和连接顶点的三角面faces组成，verts的形式为每个点的三维坐标组成的数组，
         faces也为二维数组，其每一行代表一个三角面，表示形式为组成这个三角面的三个点在verts中的3个索引。
@@ -137,7 +141,10 @@ class Sand:
 
     def _visualizeTriMesh(self, cube, color=(0.65, 0.65, 0.65), figure=None, **kwargs):
         from mayavi import mlab
-        verts, faces = self.surface(cube)
+        if "level" in kwargs:
+            verts, faces = self.findSurface(cube, level=kwargs.pop("level"))
+        else:
+            verts, faces = self.findSurface(cube)
         figure = mlab.triangular_mesh(verts[:, 0],
                                       verts[:, 1],
                                       verts[:, 2],
@@ -159,37 +166,69 @@ class Sand:
                          magnification=magnification)
         return
 
-    def rotate(self, angle, axes=(1, 0)):  # 这个axes和下面的random_rotate是联系的，要搞懂
-        """旋转颗粒"""
-        # 如果cube里面出现了0和1以外的值就报错（应该是威哥犯过这样的错误），这行代码挺耗时间的
-        assert len(np.unique(self.cube)) == 2
-        rotated = ndi.rotate(self.cube, angle, axes, reshape=False)
-        # 这样分域值的理由是什么？？？
-        return np.where(rotated >= 0.5, 1, 0).astype(np.uint8)
+    def rotateInAPlane(self, angle, axes=(1, 0), cube=None):
+        """平行于某平面对三维颗粒进行旋转。
 
-    def random_rotate(self):
-        """随机旋转颗粒"""
-        angle = 360 * np.random.rand()
-        axes = sample_labels(2, [0, 3])  # 终于用上你了，不会就这点用吧？
-        return self.rotate(angle, axes)
+        Parameters:
+        -----------
+        angle (float): The rotation angle in degrees.
+        axes (tuple of two ints): The two axes that define the plane of rotation.
 
-    def pca_eig(self, cloud):
-        """应该是pca_eigenvalue，这里的主成分代表什么意思？？？"""
-        # np.con()返回一个array_like的各行之间的协方差的矩阵(convariance)
-        inertia = np.cov(cloud)  # inertia：[力]惯性；惰性，迟钝
-        # np.linalg.eig(square_array) 返回输入方阵的特征值和右特征向量
-        e_values, e_vectors = np.linalg.eig(inertia)
-        # np.argsort() returns the indices that would sort an array.
-        order = np.argsort(e_values)
-        eval3, eval2, eval1 = e_values[order]
-        axis3, axis2, axis1 = e_vectors[:, order].transpose()
-        return [eval3, eval2, eval1], [axis3, axis2, axis1]
+        Note:
+        -----
+            1. `ndi.rotate()`函数旋转完之后的数组其数值不再是二值化的，而是0~255之间的数都可能有；
+            2. 由上，这里以中值为界，仍然将数组二值化，而之所以采用中值为阈值，是参考了`marching_cubes()`的`level`参数；
+            3. 上面这种二值化的方式以及是否真的需要进行二值化实在还是有待商榷。
+        """
+        if cube is None:
+            cube = self.cube
+        rotated = ndi.rotate(cube, angle, axes, reshape=False)
+        mid = (rotated.max() - rotated.min()) / 2
+        zerosMask = rotated < mid
+        rotated[zerosMask] = 0
+        rotated[~zerosMask] = 255
+        return rotated
 
-    def pose_normalization(self):  # 这部分很有问题啊！！
-        """位姿归一化"""
-        cloud = self.point_cloud()
-        _, e_vectors = self.pca_eig(cloud)
-        inv = np.linalg.inv(e_vectors)  # 求逆矩阵
+    def randomRotate(self, cube=None):
+        """随机旋转颗粒。"""
+        rotated = self.cube if cube is None else cube
+        angles = 360 * np.random.rand(3)
+        rotated = self.rotateInAPlane(angles[0], (0, 1), rotated)
+        rotated = self.rotateInAPlane(angles[1], (0, 2), rotated)
+        rotated = self.rotateInAPlane(angles[2], (1, 2), rotated)
+        return rotated
+
+    def pca(self, method=None):
+        """通过主成分分析，得到颗粒三个主成分的方向及长度，即颗粒处于相互正交的三个不同方向的最长长度。
+
+        Note:
+        -----
+            主成分分析法以方差变化最大的方向作为最长方向，然而方差最大是否真的“变化范围大”值得进一步分析，
+        这在本文中似乎并不一定完全准确。
+        """
+        if method is None:
+            # np.con()返回一个array_like各行之间协方差(convariance)的矩阵
+            covarMatrix = np.cov(self.toCoords().T)
+            # np.linalg.eig(square_array) 返回输入方阵的特征值和右特征向量
+            eigenvalues, eigenvectors = np.linalg.eig(covarMatrix)
+            order = np.argsort(eigenvalues)[::-1]
+            eigenvalues = eigenvalues[order]
+            # eigenvectors中以每列为特征向量，这里将其转置为以每行为特征向量
+            eigenvectors = eigenvectors[:, order].T
+            return eigenvalues, eigenvectors
+        elif method == "sklearn":
+            from sklearn.decomposition import PCA
+            pcaModel = PCA(n_components=3).fit(self.toCoords())
+            pc = pcaModel.components_  # 主成分
+            var = pcaModel.explained_variance_  # 方差
+            return pc, var
+        else:
+            raise ValueError("Parameter `method` must be None or 'sklearn'!")
+
+    def poseNormalization(self):  # 这部分很有问题啊！！
+        """位姿归一化。这个函数的实现原理尚不明确！"""
+        _, eigenvectors = self.pca()
+        inv = np.linalg.inv(eigenvectors[::-1])  # 求逆矩阵
         offset = np.ones(3) * (self.cube.shape[0] / 2.0 - 0.5)
         offset_1 = offset - np.dot(inv, offset)
         output = ndi.affine_transform(
@@ -208,16 +247,46 @@ class Sand:
         output_nani = np.where(output >= 0.5, 1, 0).astype(np.uint8)
         return output_nani
 
-    def rescale(self, new_size: int):
-        """将颗粒cube缩放到设置的尺寸new_size"""
-        ratio = new_size / self.cube.shape[0]
-        rescaled = ndi.zoom(self.cube, ratio, output=np.float32)
-        rescaled = np.where(rescaled >= 0.5, 1, 0).astype(np.uint8)
-        return rescaled
+    def resize(self, newSize: Union[int, Tuple[int]], thrd: float = None) -> np.ndarray:
+        """将颗粒cube缩放到新设置的尺寸。
+
+        Parameters:
+        -----------
+        newSize(int or tuple of ints): new Cube size
+        thrd(float): 默认缩放完后的cube为0~1之间的小数，可设定阈值将其转换为二值数组，
+            同`rotateInAPlane()`，一般应设置为0.5。
+        """
+        if not hasattr(newSize, "__iter__"):  # if newSize is not a sequence
+            newSize = (newSize,)*3
+        newCube = transform.resize(self.cube, newSize)
+        if thrd is not None:
+            zerosMask = newCube < thrd
+            newCube[zerosMask] = 0
+            newCube[zerosMask] = 255
+            newCube = newCube.astype(np.uint8)
+        return newCube
+
+    def rescale(self, ratio: Union[float, Tuple[float]], thrd: float = None) -> np.ndarray:
+        """将颗粒cube按比例缩放。
+
+        Parameters:
+        -----------
+        ratio(float or tuple of floats): scale factors
+        thrd(float): 同`resize()`
+        """
+        if not hasattr(ratio, "__iter__"):
+            ratio = (ratio,)*3
+        newCube = transform.rescale(self.cube, ratio)
+        if thrd is not None:
+            zerosMask = newCube < thrd
+            newCube[zerosMask] = 0
+            newCube[zerosMask] = 255
+            newCube = newCube.astype(np.uint8)
+        return newCube
 
     # ----------------------------以下为计算颗粒的几何特征参数--------------------------
 
-    def sand_convex_hull(self, level: float = None) -> ConvexHull:
+    def sandConvexHull(self, level: float = None) -> ConvexHull:
         """获取沙颗粒的凸包
         ConvexHull is a class that calculates the convex hull（凸包） of a given point set.
         |  Parameters
@@ -246,27 +315,26 @@ class Sand:
         |  volume : float
         |      Volume of the convex hull."""
         if self._verts is None:
-            self.surface(level=level)
+            self.findSurface(level=level)
         convex_hull = ConvexHull(self._verts)
         self._convexHull = convex_hull
         return convex_hull
 
-    def circumscribed_sphere(self, level: float = None):
+    def circumscribedSphere(self, level: float = None):
         """返回沙土颗粒的最小外接球的半径和球心坐标，似乎也是调用的人家的包"""
         if self._verts is None:
-            self.surface(level=level)
+            self.findSurface(level=level)
         radius, centre, *_ = Circumsphere.fit(self._verts)
         return radius, centre
 
-    def equ_ellipsoidal_params(self):
+    def equEllipsoidalParams(self) -> Tuple[float, float, float]:
         """返回颗粒等效椭球的长、中、短轴的长度，half_axis, long >> small"""
-        cloud = self.point_cloud()
-        a, b, c = 2 * np.sqrt(self.pca_eig(cloud)[0])
-        return c, b, a
+        long, medium, short = 2 * np.sqrt(self.pca()[0])
+        return long, medium, short
 
-    def surf_area(self) -> float:
+    def surfaceArea(self) -> float:
         """计算沙土颗粒的表面积"""
-        verts, faces = self.surface(level=0)
+        verts, faces = self.findSurface(level=0)
         area = measure.mesh_surface_area(verts, faces)
         self._area = area
         return area
@@ -279,32 +347,32 @@ class Sand:
     def sphericity(self) -> float:
         """计算球度sphericity"""
         volume = self.volume() if self._volume is None else self._volume
-        area = self.surf_area() if self._area is None else self._area
+        area = self.surfaceArea() if self._area is None else self._area
         return (36*np.pi*volume**2)**(1/3) / area
 
     def EI_FI(self) -> tuple:
         """计算伸长率EI和扁平率FI"""
-        l, m, s = self.equ_ellipsoidal_params()
+        l, m, s = self.equEllipsoidalParams()
         return l/m, m/s
 
     def convexity(self) -> float:
         """计算凸度：颗粒体积与凸包体积之比"""
-        convex_hull = self.sand_convex_hull() if self._convexHull is None else self._convexHull
+        convex_hull = self.sandConvexHull() if self._convexHull is None else self._convexHull
         volume = self.volume() if self._volume is None else self._volume
         return volume / convex_hull.volume
 
     def angularity(self) -> float:
         """计算颗粒棱角度(angularity).定义为凸包表面积 P_c 和等效椭球表面积 P_e 之比。"""
-        a, b, c = self.equ_ellipsoidal_params()
+        a, b, c = self.equEllipsoidalParams()
         P_e = 4*np.pi*(((a*b)**1.6+(a*c)**1.6+(b*c)**1.6)/3)**(1/1.6)
-        convex_hull = self.sand_convex_hull() if self._convexHull is None else self._convexHull
+        convex_hull = self.sandConvexHull() if self._convexHull is None else self._convexHull
         P_c = convex_hull.area
         return P_c / P_e
 
     def roughness(self) -> float:
         """计算颗粒的粗糙度。"""
-        surf_p = self.surf_area()
-        convex_hull = self.sand_convex_hull() if self._convexHull is None else self._convexHull
+        surf_p = self.surfaceArea()
+        convex_hull = self.sandConvexHull() if self._convexHull is None else self._convexHull
         surf_c = convex_hull.area
         return surf_p/surf_c
 

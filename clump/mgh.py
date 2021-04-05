@@ -195,7 +195,7 @@ if __name__ == "__main__":
     # sandCube = data[46, 0]
     sandCube = np.load("../132.npy")
     sand = Sand(sandCube)
-    sandPointCloud = sand.point_cloud().T
+    sandPointCloud = sand.toCoords()
     cells = CellCollection(sandPointCloud, nX=20)
     scpMatrix = SCPMatrix(cells)
     scpMatrix.solverTest()
