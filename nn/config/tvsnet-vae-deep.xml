@@ -4,10 +4,10 @@
     <hp>
         <nEpoch>100</nEpoch>
         <bs>64</bs>
-        <lr>5e-5</lr>
+        <lr>5e-4</lr>
         <nLatent>64</nLatent>
         <lambda>1</lambda>
-        <rotation>30</rotation>
+        <rotation>60</rotation>
     </hp>
     <nnLayer>
         <!-- Encoder -->
