@@ -4,7 +4,7 @@
     <hp>
         <nEpoch>100</nEpoch>
         <bs>64</bs>
-        <lr>5e-4</lr>
+        <lr>1e-3</lr>
         <nLatent>64</nLatent>
         <lambda>1</lambda>
         <rotation>180</rotation>
@@ -14,7 +14,7 @@
         <!-- 64 * 64 -->
         <conv dim="2d" id="1" block="Encoder">
             <in_channels>3</in_channels>
-            <out_channels>16</out_channels>
+            <out_channels>32</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -25,18 +25,6 @@
 
         <!-- 32 * 32 -->
         <conv dim="2d" id="2" block="Encoder">
-            <in_channels>16</in_channels>
-            <out_channels>32</out_channels>
-            <kernel_size>4</kernel_size>
-            <stride>2</stride>
-            <padding>1</padding>
-            <bias>false</bias>
-            <normalize>bn</normalize>
-            <activate>relu</activate>
-        </conv>
-
-        <!-- 16 * 16 -->
-        <conv dim="2d" id="3" block="Encoder">
             <in_channels>32</in_channels>
             <out_channels>64</out_channels>
             <kernel_size>4</kernel_size>
@@ -47,8 +35,8 @@
             <activate>relu</activate>
         </conv>
 
-        <!-- 8 * 8 -->
-        <conv dim="2d" id="4" block="Encoder">
+        <!-- 16 * 16 -->
+        <conv dim="2d" id="3" block="Encoder">
             <in_channels>64</in_channels>
             <out_channels>128</out_channels>
             <kernel_size>4</kernel_size>
@@ -59,10 +47,22 @@
             <activate>relu</activate>
         </conv>
 
-        <!-- 4 * 4 -->
-        <conv dim="2d" id="5" block="Encoder">
+        <!-- 8 * 8 -->
+        <conv dim="2d" id="4" block="Encoder">
             <in_channels>128</in_channels>
             <out_channels>256</out_channels>
+            <kernel_size>4</kernel_size>
+            <stride>2</stride>
+            <padding>1</padding>
+            <bias>false</bias>
+            <normalize>bn</normalize>
+            <activate>relu</activate>
+        </conv>
+
+        <!-- 4 * 4 -->
+        <conv dim="2d" id="5" block="Encoder">
+            <in_channels>256</in_channels>
+            <out_channels>512</out_channels>
             <kernel_size>4</kernel_size>
             <stride>1</stride>
             <padding>0</padding>
@@ -75,7 +75,7 @@
         <!-- nLatent * 1 * 1 * 1 -->
         <convT dim="3d" id="1" block="Decoder">
             <in_channels>64</in_channels>
-            <out_channels>256</out_channels>
+            <out_channels>512</out_channels>
             <kernel_size>1</kernel_size>
             <stride>1</stride>
             <padding>0</padding>
@@ -87,8 +87,8 @@
 
         <!-- 256 * 1 * 1 * 1 -->
         <convT dim="3d" id="2" block="Decoder">
-            <in_channels>256</in_channels>
-            <out_channels>128</out_channels>
+            <in_channels>512</in_channels>
+            <out_channels>256</out_channels>
             <kernel_size>4</kernel_size>
             <stride>1</stride>
             <padding>0</padding>
@@ -100,8 +100,8 @@
 
         <!-- 128 * 4 * 4 * 4 -->
         <convT dim="3d" id="3" block="Decoder">
-            <in_channels>128</in_channels>
-            <out_channels>64</out_channels>
+            <in_channels>256</in_channels>
+            <out_channels>128</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -113,8 +113,8 @@
 
         <!-- 64 * 8 * 8 * 8 -->
         <convT dim="3d" id="4" block="Decoder">
-            <in_channels>64</in_channels>
-            <out_channels>32</out_channels>
+            <in_channels>128</in_channels>
+            <out_channels>64</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -126,8 +126,8 @@
 
         <!-- 32 * 16 * 16 * 16 -->
         <convT dim="3d" id="5" block="Decoder">
-            <in_channels>32</in_channels>
-            <out_channels>16</out_channels>
+            <in_channels>64</in_channels>
+            <out_channels>32</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
             <padding>1</padding>
@@ -139,7 +139,7 @@
 
         <!-- 16 * 32 * 32 * 32 -->
         <convT dim="3d" id="6" block="Decoder">
-            <in_channels>16</in_channels>
+            <in_channels>32</in_channels>
             <out_channels>1</out_channels>
             <kernel_size>4</kernel_size>
             <stride>2</stride>
