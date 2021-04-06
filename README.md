@@ -12,3 +12,4 @@
 ## 进度记录
 
 -   wgan: wgan_cp 与 wgan_gp 总是训练不出来，无法收敛。
+-   class `Sand`: 位姿归一化方法未校正。

@@ -1,15 +1,14 @@
 import os
 from typing import Tuple, Union
-import numpy as np
 
+import numpy as np
+from scipy.spatial import ConvexHull
 import scipy.ndimage as ndi
 from skimage import filters, exposure, measure, morphology, transform
 from skimage.feature import peak_local_max
 from skimage.segmentation import watershed
-
-import matplotlib.pyplot as plt
-from scipy.spatial import ConvexHull
 from skimage.util import img_as_ubyte
+import matplotlib.pyplot as plt
 
 from .utils.dirty import timer, Circumsphere
 
