@@ -6,6 +6,13 @@ import scipy
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import jensenshannon
 
+from skimage import io, filters
+from skimage.color import rgb2gray
+from skimage.util import img_as_ubyte
+from skimage.filters import threshold_otsu
+from skimage import measure, transform
+from scipy import ndimage as ndi
+
 import torch
 
 
@@ -21,6 +28,42 @@ def loadNnData(sourcePath, keyword: str = None) -> torch.Tensor:
 
 def project(tensor: torch.tensor, dim: int):
     return torch.max(tensor, dim=dim).values
+
+
+class TVSHelper:
+    @staticmethod
+    def getOutline(imgFile="img.jpg"):
+        img = io.imread(imgFile, as_gray=True)
+
+        # 检测到边缘并进行滤波
+        edge = filters.sobel(img)
+        edge = img_as_ubyte(rgb2gray(edge))
+        edge = ndi.median_filter(edge, 3)
+
+        # 二值化
+        thrd = threshold_otsu(edge)
+        maskOfWhite = edge > thrd
+        edge[maskOfWhite] = 255
+        edge[~maskOfWhite] = 0
+
+        # 提取
+        labeledImg = measure.label(edge, connectivity=2)
+        regionProps = measure.regionprops(labeledImg)
+        regionProps.sort(key=lambda prop: prop.area, reverse=True)
+        targetImage = regionProps[0].filled_image
+        return targetImage
+
+    @staticmethod
+    def putIntoCube(image, size=48, **kwargs):
+        longToWidthRatio = max(image.shape) / min(image.shape)
+        image = transform.resize(
+            image, (size, size // longToWidthRatio), **kwargs)
+        cube = np.zeros((64, 64), dtype=np.uint8)
+        initRowInd, initColInd = (
+            np.array(cube.shape) - np.array(image.shape))//2
+        cube[initRowInd:initRowInd+image.shape[0],
+             initColInd:initColInd+image.shape[1]] = image
+        return cube
 
 
 class Circumsphere:
