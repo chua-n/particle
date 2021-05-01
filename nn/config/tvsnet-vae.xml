@@ -73,17 +73,16 @@
 
         <!-- Decoder -->
         <!-- nLatent * 1 * 1 * 1 -->
-        <convT dim="3d" id="1" block="Decoder">
+        <conv dim="3d" id="1" block="Decoder">
             <in_channels>64</in_channels>
             <out_channels>512</out_channels>
             <kernel_size>1</kernel_size>
             <stride>1</stride>
             <padding>0</padding>
-            <output_padding>0</output_padding>
-            <bias>false</bias>
-            <normalize>bn</normalize>
-            <activate>relu</activate>
-        </convT>
+            <bias>true</bias>
+            <normalize>null</normalize>
+            <activate>null</activate>
+        </conv>
 
         <!-- 256 * 1 * 1 * 1 -->
         <convT dim="3d" id="2" block="Decoder">
