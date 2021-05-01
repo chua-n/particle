@@ -194,11 +194,11 @@ class Violin:
         self.dataSet = pd.concat(dataSet, axis=0)
         self.name = name
 
-    def plot(self, *, feature, setName, figsize=None, **kwargs):
+    def plot(self, *, feature, setName, figsize=None, zhfontProperty=None, **kwargs):
         import seaborn as sns
         import matplotlib.pyplot as plt
 
-        # font = {'font': "Monospace", 'fontsize': 18}
+        zhfont = {'font': zhfontProperty}
         axNum = len(setName)
         if axNum == 1:
             data = self.dataSet.loc[setName, feature]
@@ -210,32 +210,36 @@ class Violin:
             data = self.dataSet.loc[setName, feature]
             js = self.jsHelper(data[setName[0]], data[setName[1]])
             data = pd.DataFrame(data)
-            data['dataSet'] = None
+            data['Data Set'] = None
             for name in setName:
-                data.loc[name, 'dataSet'] = name
-            sns.violinplot(data=data, x=[0]*len(data), y=feature, hue='dataSet',
+                data.loc[name, 'Data Set'] = name
+            sns.violinplot(data=data, x=[0]*len(data), y=feature, hue='Data Set',
                            split=True, ax=ax, **kwargs)
-            ax.set_title(f"JS-Divergence: {js}")
+            ax.set_xticks([])
+            ax.set_title(f"JS散度: {js}", fontdict=zhfont)
         elif axNum == 3:
             setName = list(setName)
-            fig, ax = plt.subplots(1, 2, sharey=True, figsize=figsize)
+            fig, ax = plt.subplots(1, 2, sharey=True, figsize=figsize, tight_layout=True)
             data = self.dataSet.loc[setName, feature]
             data = pd.DataFrame(data)
-            data['dataSet'] = None
+            data['Data Set'] = None
             for name in setName:
-                data.loc[name, 'dataSet'] = name
-            vaeData = data.loc[['real', 'vae']]
-            ganData = data.loc[['real', 'gan']]
-            sns.violinplot(data=vaeData, x=[0]*len(vaeData), y=feature, hue='dataSet',
+                data.loc[name, 'Data Set'] = name
+            vaeData = data.loc[['Real', 'VAE']]
+            ganData = data.loc[['Real', 'GAN']]
+            sns.violinplot(data=vaeData, x=[0]*len(vaeData), y=feature, hue='Data Set',
                            split=True, ax=ax[0], **kwargs)
-            sns.violinplot(data=ganData, x=[0]*len(ganData), y=feature, hue='dataSet',
+            sns.violinplot(data=ganData, x=[0]*len(ganData), y=feature, hue='Data Set',
                            split=True, ax=ax[1], **kwargs)
             jsVae = self.jsHelper(
-                vaeData.loc['real', feature].values, vaeData.loc['vae', feature].values)
+                vaeData.loc['Real', feature].values, vaeData.loc['VAE', feature].values)
             jsGan = self.jsHelper(
-                ganData.loc['real', feature].values, ganData.loc['gan', feature].values)
-            ax[0].set_title(f"JS-Divergence: {jsVae}")
-            ax[1].set_title(f"JS-Divergence: {jsGan}")
+                ganData.loc['Real', feature].values, ganData.loc['GAN', feature].values)
+            ax[0].set_xticks([])
+            ax[1].set_xticks([])
+            ax[1].set_ylabel(None)
+            ax[0].set_title(f"JS散度: {jsVae}", fontdict=zhfont)
+            ax[1].set_title(f"JS散度: {jsGan}", fontdict=zhfont)
             # ax[1].set_ylabel(None)
         else:
             raise ValueError("Check the parameter `setName`!")
