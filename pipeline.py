@@ -339,7 +339,7 @@ class Sand:
         return area
 
     def volume(self) -> float:
-        volume = np.sum(self.cube == 1)
+        volume = float(np.sum(self.cube == 1))
         self._volume = volume
         return volume
 
@@ -665,6 +665,8 @@ class SandHeap:
             raise ValueError("Parameter `mode` should be either '2D' or '3D'.")
 
         segmented = self.data + segmentationFace
+        # 考虑把上式改成下述形式：因为self.data为bool类型，segmentationFace为np.uint8类型
+        # segmented = img_as_ubyte(self.data) - segmentationFace
         self.finalSegmented = segmented
         self.setStatus("final-segmented")
         if persistence:
