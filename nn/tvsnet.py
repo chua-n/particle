@@ -100,7 +100,7 @@ class TVSNet(nn.Module):
                                        voxel=voxel, glyph=glyph, scale_mode='scalar')
         return fig1, fig2
 
-    def generate(self, x, color=(0.65, 0.65, 0.65), opacity=1.0, voxel=False, glyph='sphere'):
+    def generate(self, x, **kwargs):
         """
         Parameters:
         -----------
@@ -113,8 +113,8 @@ class TVSNet(nn.Module):
             x.unsqueeze_(dim=0)
             y_re = self.forward(x)
             cube = Sand(y_re[0, 0].detach().numpy())
-            fig = cube.visualize(figure='Generated Particle', color=color, opacity=opacity,
-                                 voxel=voxel, glyph=glyph, scale_mode='scalar')
+            fig = cube.visualize(figure='Generated Particle',
+                                 scale_mode='scalar', **kwargs)
         return fig
 
 
@@ -159,6 +159,7 @@ class VaeDecoder(nn.Module):
         coding = coding.view(*coding.shape, 1, 1, 1)
         reconstruction = coding
         for name, module in self.named_children():
+            # reconstruction = module(reconstruction)
             if name.startswith("convT-"):
                 reconstruction = module(reconstruction)
         return reconstruction
@@ -271,6 +272,8 @@ def train(sourcePath="data/liutao/v1/particles.npz",
     if kernel == "vae":
         model = VaeTVSNet(xml).to(device)
         model.initialize()
+        # model.load_state_dict(torch.load(
+        #     "/home/chuan/soil/output/tvsnet/vae/通道加多/no-dropout/state_dict.pt"))
         lossFn = model.lossFn
     else:
         model = TVSNet(xml).to(device)
@@ -340,5 +343,5 @@ def train(sourcePath="data/liutao/v1/particles.npz",
 
 if __name__ == "__main__":
     torch.manual_seed(3.14)
-    train(kernel=None)
-    # train(kernel="vae", xml="particle/nn/config/tvsnet-vae-deep.xml")
+    # train(kernel=None)
+    train(kernel="vae", xml="particle/nn/config/tvsnet-vae.xml",)
