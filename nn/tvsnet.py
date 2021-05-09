@@ -1,4 +1,6 @@
 import os
+from typing import Union
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
@@ -74,48 +76,6 @@ class TVSNet(nn.Module):
         x = x.view(x.size(0), self.fcBlockOutFeatures, 1, 1, 1)
         x = self.convTransposeBlock(x)
         return x
-
-    def contrast(self, x, y, voxel=False, glyph='sphere'):
-        """对于输入的数据源颗粒y及其投影x，对比其原始的颗粒图像与对应的重建颗粒的图像，
-        默认绘制的是三维面重建后再采用高斯模糊的图像。
-
-        Parameters:
-        -----------
-        x(array_like): 3 * 64 * 64
-        y(array_like): 64 * 64 * 64
-        voxel(bool, optional): Whether to draw a voxel-represented figure
-        glyph(str, optional): The glyph used to represent a single voxel, works only
-            when `voxel=True`.
-        """
-        with torch.no_grad():
-            x = torch.as_tensor(x, dtype=torch.float32)
-            y = torch.as_tensor(y)
-            x, y = x.view(1, *x.shape), y.view(1, 1, *y.shape)
-            y_re = self.forward(x)
-            raw_cube = Sand(y[0, 0].detach().numpy())
-            fake_cube = Sand(y_re[0, 0].detach().numpy())
-            fig1 = raw_cube.visualize(figure='Original Particle',
-                                      voxel=voxel, glyph=glyph)
-            fig2 = fake_cube.visualize(figure='Reconstructed Particle',
-                                       voxel=voxel, glyph=glyph, scale_mode='scalar')
-        return fig1, fig2
-
-    def generate(self, x, **kwargs):
-        """
-        Parameters:
-        -----------
-        x(array_like): 3 * 64 * 64
-        voxel(bool, optional): Whether to draw a voxelization figure
-        glyph(str, optinoal): The glyph represents a single voxel, this argument
-            works only when `voxel=True`"""
-        with torch.no_grad():
-            x = torch.as_tensor(x, dtype=torch.float32)
-            x.unsqueeze_(dim=0)
-            y_re = self.forward(x)
-            cube = Sand(y_re[0, 0].detach().numpy())
-            fig = cube.visualize(figure='Generated Particle',
-                                 scale_mode='scalar', **kwargs)
-        return fig
 
 
 class VaeEncoder(nn.Module):
@@ -204,50 +164,53 @@ class VaeTVSNet(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
         return
 
-    def contrast(self, x, y, **kwargs):
-        """对于输入的数据源颗粒y及其投影x，对比其原始的颗粒图像与对应的重建颗粒的图像，
-        默认绘制的是三维面重建后再采用高斯模糊的图像。
 
-        Parameters:
-        -----------
-        x(array_like): 3 * 64 * 64
-        y(array_like): 64 * 64 * 64
-        voxel(bool, optional): Whether to draw a voxel-represented figure
-        glyph(str, optional): The glyph used to represent a single voxel, works only
-            when `voxel=True`.
-        """
-        status = self.training
-        self.eval()
-        with torch.no_grad():
-            x = torch.as_tensor(x, dtype=torch.float32)
-            y = torch.as_tensor(y)
-            x, y = x.view(1, *x.shape), y.view(1, 1, *y.shape)
-            yRe, *_ = self.forward(x)
-            rawCube = Sand(y[0, 0].detach().numpy())
-            fakeCube = Sand(yRe[0, 0].detach().numpy())
-            fakeCube.cube[fakeCube.cube <= 0.5] = 0
-            fakeCube.cube[fakeCube.cube > 0.5] = 1
-            fig1 = rawCube.visualize(figure='Original Particle', **kwargs)
-            fig2 = fakeCube.visualize(
-                figure='Reconstructed Particle', **kwargs)
-        self.training = status
-        return fig1, fig2
+def contrast(model: Union[TVSNet, VaeTVSNet], x, y, **kwargs):
+    """对于输入的数据源颗粒y及其投影x，对比其原始的颗粒图像与对应的重建颗粒的图像，
+    默认绘制的是三维面重建后再采用高斯模糊的图像。
 
-    def generate(self, x, **kwargs):
-        """
-        Parameters:
-        -----------
-        x(array_like): 3 * 64 * 64"""
-        status = self.training
-        self.eval()
-        with torch.no_grad():
-            x = torch.as_tensor(x, dtype=torch.float32)
-            x.unsqueeze_(dim=0)
-            yRe, *_ = self.forward(x)
-            cube = Sand(yRe[0, 0].numpy())
-            fig = cube.visualize(figure='Generated Particle', **kwargs)
-        self.training = status
-        return fig
+    Parameters:
+    -----------
+    x(array_like): 3 * 64 * 64
+    y(array_like): 64 * 64 * 64
+    """
+    status = model.training
+    model.eval()
+    with torch.no_grad():
+        x = torch.as_tensor(x, dtype=torch.float32)
+        y = torch.as_tensor(y)
+        x, y = x.view(1, *x.shape), y.view(1, 1, *y.shape)
+        yRe, *_ = model(x)
+        rawCube = Sand(y[0, 0].detach().numpy())
+        fakeCube = Sand(yRe[0, 0].detach().numpy())
+        fakeCube.cube[fakeCube.cube <= 0.5] = 0
+        fakeCube.cube[fakeCube.cube > 0.5] = 1
+        fig1 = rawCube.visualize(figure='Original Particle', **kwargs)
+        fig2 = fakeCube.visualize(
+            figure='Reconstructed Particle', **kwargs)
+    model.training = status
+    return fig1, fig2
+
+
+def generateOneParticle(model: Union[TVSNet, VaeTVSNet], x):
+    """Generate one numpy particle cube use the given `model` and input `x`.
+
+    Parameters:
+    -----------
+    x(array_like): 3 * 64 * 64
+
+    Returns:
+    --------
+    yRe(numpy.ndarray): 64 * 64 * 64"""
+    status = model.training
+    model.eval()
+    with torch.no_grad():
+        x = torch.as_tensor(x, dtype=torch.float32)
+        x.unsqueeze_(dim=0)
+        yRe, *_ = model(x)
+        yRe = yRe[0, 0].numpy()
+    model.training = status
+    return yRe
 
 
 def train(sourcePath="data/liutao/v1/particles.npz",
@@ -344,4 +307,4 @@ def train(sourcePath="data/liutao/v1/particles.npz",
 if __name__ == "__main__":
     torch.manual_seed(3.14)
     # train(kernel=None)
-    train(kernel="vae", xml="particle/nn/config/tvsnet-vae.xml",)
+    train(kernel="vae", xml="particle/nn/config/tvsnet-vae-deep.xml",)

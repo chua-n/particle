@@ -83,7 +83,7 @@ def singleSphere(center, radius, nPoints=100, opacity=1.0, color=None):
     return scene
 
 
-def sphere(center, radius, resolution=30):
+def sphere(center, radius, resolution=30, **kwargs):
     """Draw some spheres according to given center and radius.
 
     Parameters:
@@ -94,8 +94,8 @@ def sphere(center, radius, resolution=30):
     """
     x, y, z = center[:, 0], center[:, 1], center[:, 2]
     from mayavi import mlab
-    scene = mlab.points3d(
-        x, y, z, radius*2, scale_factor=1, resolution=resolution)
+    scene = mlab.points3d(x, y, z, radius*2, scale_factor=1,
+                          resolution=resolution, **kwargs)
     return scene
 
 
@@ -219,7 +219,8 @@ class Violin:
             ax.set_title(f"JS散度: {js}", fontdict=zhfont)
         elif axNum == 3:
             setName = list(setName)
-            fig, ax = plt.subplots(1, 2, sharey=True, figsize=figsize, tight_layout=True)
+            fig, ax = plt.subplots(1, 2, sharey=True,
+                                   figsize=figsize, tight_layout=True)
             data = self.dataSet.loc[setName, feature]
             data = pd.DataFrame(data)
             data['Data Set'] = None
