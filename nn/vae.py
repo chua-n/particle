@@ -171,7 +171,7 @@ class Vae(nn.Module):
 
         return:
         -------
-        cubes(np.array): (64, 64, 64) or (*, 64, 64 ,64)
+        cubes(np.array): (64, 64, 64) or (*, 64, 64, 64)
         """
 
         decoder = self.decoder.cpu()
